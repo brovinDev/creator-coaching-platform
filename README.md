@@ -1,4 +1,4 @@
-# CreatorPlatform — Creator Coaching Platform MVP
+# CreatorPlatform — Creator Coaching Platform MVP 
 
 A TagMango-like creator platform where creators can build courses, publish landing pages, accept payments via Razorpay, and manage a community for their students.
 
