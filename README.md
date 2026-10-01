@@ -1,36 +1,131 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CreatorPlatform — Creator Coaching Platform MVP
+
+A TagMango-like creator platform where creators can build courses, publish landing pages, accept payments via Razorpay, and manage a community for their students.
+
+## Features
+
+- **Authentication** — Sign up, login, forgot/reset password, role-based access (Creator/Student)
+- **Creator Dashboard** — Overview stats, courses, landing pages, community, customers, payments, settings
+- **Course Management** — Create courses with modules and lessons, publish/unpublish, set pricing
+- **Landing Page Builder** — Template-based section editor with hero, pricing, FAQ, CTA sections
+- **Meta Pixel** — Configure Meta Pixel ID per landing page, tracks PageView/ViewContent events
+- **Razorpay Checkout** — Secure payment flow with backend verification before enrollment
+- **Student Dashboard** — View enrolled courses, track lesson progress, access community
+- **Community** — Channels, posts, comments, replies, creator moderation
+- **Email Notifications** — Welcome, password reset, payment confirmation, enrollment, purchase alerts
+
+## Tech Stack
+
+- **Framework**: Next.js 16 (App Router, Server Components)
+- **Language**: TypeScript
+- **Styling**: Tailwind CSS 4
+- **Database**: PostgreSQL + Prisma 7
+- **Auth**: NextAuth.js v5
+- **Payments**: Razorpay
+- **Email**: Nodemailer (SMTP)
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- Node.js 22+
+- PostgreSQL database
+- Razorpay account (test mode)
+- SMTP credentials (Gmail app password works)
+
+### Setup
+
+1. **Clone and install**
+   ```bash
+   git clone <repo-url>
+   cd creator-coaching-platform
+   npm install
+   ```
+
+2. **Configure environment**
+   ```bash
+   cp .env.example .env
+   # Edit .env with your database URL, Razorpay keys, SMTP credentials
+   ```
+
+3. **Set up database**
+   ```bash
+   npm run db:push      # Push schema to database
+   npm run db:seed      # Seed with demo data
+   ```
+
+4. **Run development server**
+   ```bash
+   npm run dev
+   ```
+
+5. **Open** [http://localhost:3000](http://localhost:3000)
+
+### Demo Accounts
+
+After seeding:
+
+| Role    | Email              | Password    |
+|---------|--------------------|-------------|
+| Creator | creator@demo.com   | creator123  |
+| Student | student@demo.com   | student123  |
+
+## Project Structure
+
+```
+src/
+├── app/
+│   ├── (auth)/          # Login, signup, password reset
+│   ├── api/             # API routes
+│   │   ├── auth/        # Auth endpoints
+│   │   ├── courses/     # Course CRUD
+│   │   ├── landing-pages/ # Landing page CRUD
+│   │   ├── community/   # Community endpoints
+│   │   ├── checkout/    # Payment creation & verification
+│   │   ├── public/      # Public course data
+│   │   └── student/     # Student-specific endpoints
+│   ├── creator/         # Creator dashboard pages
+│   ├── student/         # Student dashboard pages
+│   ├── checkout/        # Checkout page
+│   ├── p/               # Public landing pages
+│   ├── payment-success/ # Payment success page
+│   └── payment-failed/  # Payment failure page
+├── components/
+│   ├── ui/              # Reusable UI components
+│   ├── creator/         # Creator-specific components
+│   ├── student/         # Student-specific components
+│   └── community/       # Community components
+├── lib/
+│   ├── auth.ts          # NextAuth configuration
+│   ├── db.ts            # Prisma client
+│   ├── email.ts         # Email templates & sending
+│   ├── razorpay.ts      # Razorpay client & verification
+│   └── utils.ts         # Utility functions
+└── generated/prisma/    # Generated Prisma client
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Scripts
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Command           | Description                    |
+|-------------------|--------------------------------|
+| `npm run dev`     | Start development server       |
+| `npm run build`   | Build for production           |
+| `npm run start`   | Start production server        |
+| `npm run db:push` | Push schema to database        |
+| `npm run db:seed` | Seed database with demo data   |
+| `npm run db:studio` | Open Prisma Studio           |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## User Flows
 
-## Learn More
+### Creator Flow
+Signup → Dashboard → Create Course → Add Modules/Lessons → Set Price → Create Landing Page → Publish → Share URL
 
-To learn more about Next.js, take a look at the following resources:
+### Student Flow
+Open Landing Page → View Course → Buy Now → Checkout → Razorpay Payment → Backend Verification → Enrollment → Dashboard → Access Course → Community
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Payment Security
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Razorpay orders are created server-side
+- Payment signatures are verified on the backend using HMAC-SHA256
+- Enrollment is only created after successful server-side verification
+- Frontend payment callbacks are never trusted alone
