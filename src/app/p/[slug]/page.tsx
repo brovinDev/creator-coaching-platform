@@ -180,7 +180,7 @@ export default async function PublicLandingPage({ params }: { params: Promise<{ 
           })}
 
         <footer className="py-8 px-4 text-center text-sm text-gray-400">
-          Powered by CreatorPlatform
+          Powered by {process.env.NEXT_PUBLIC_APP_NAME || "Upskill"}
         </footer>
       </div>
     </>

@@ -6,7 +6,7 @@ export default function HomePage() {
     <div className="min-h-screen bg-white">
       <header className="shadow-[0_1px_0_rgba(0,0,0,0.05)]">
         <div className="max-w-6xl mx-auto px-4 flex items-center justify-between h-16">
-          <span className="text-xl font-bold text-indigo-600">CreatorPlatform</span>
+          <span className="text-xl font-bold text-indigo-600">{process.env.NEXT_PUBLIC_APP_NAME || "Upskill"}</span>
           <div className="flex items-center gap-4">
             <Link href="/login" className="text-sm font-medium text-gray-600 hover:text-gray-900 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors">
               Sign In
@@ -99,7 +99,7 @@ export default function HomePage() {
       </section>
 
       <footer className="py-8 px-4 text-center text-sm text-gray-400">
-        &copy; {new Date().getFullYear()} CreatorPlatform. All rights reserved.
+        &copy; {new Date().getFullYear()} {process.env.NEXT_PUBLIC_APP_NAME || "Upskill"}. All rights reserved.
       </footer>
     </div>
   );

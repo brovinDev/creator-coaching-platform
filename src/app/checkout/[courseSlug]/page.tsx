@@ -207,7 +207,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
         key: orderData.key,
         amount: orderData.amount,
         currency: orderData.currency,
-        name: "CreatorPlatform",
+        name: process.env.NEXT_PUBLIC_APP_NAME || "Upskill",
         description: course.title,
         order_id: orderData.razorpayOrderId,
         prefill: { name: form.name, email: form.email },

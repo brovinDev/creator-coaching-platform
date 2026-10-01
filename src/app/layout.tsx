@@ -7,7 +7,7 @@ import { SessionProvider } from "next-auth/react";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "CreatorPlatform - Create & Sell Online Courses",
+  title: `${process.env.NEXT_PUBLIC_APP_NAME || "Upskill"} - Create & Sell Online Courses`,
   description: "Build, sell, and manage your online courses with ease.",
 };
 

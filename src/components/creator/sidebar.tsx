@@ -60,7 +60,7 @@ export function CreatorSidebar({ user }: SidebarProps) {
       >
         <div className="flex items-center justify-between px-6 py-5">
           <Link href="/creator" className="text-lg font-bold text-indigo-600">
-            CreatorPlatform
+            {process.env.NEXT_PUBLIC_APP_NAME || "Upskill"}
           </Link>
           <button onClick={() => setMobileOpen(false)} className="lg:hidden hover:bg-gray-100 rounded-lg p-1 transition-colors">
             <X className="h-5 w-5" />

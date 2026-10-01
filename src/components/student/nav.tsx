@@ -20,7 +20,7 @@ export function StudentNav({ user }: { user: { name: string } }) {
     <header className="bg-white shadow-[0_1px_3px_rgba(0,0,0,0.05)] sticky top-0 z-30">
       <div className="max-w-6xl mx-auto px-4 flex items-center justify-between h-16">
         <Link href="/student" className="text-lg font-bold text-indigo-600">
-          CreatorPlatform
+          {process.env.NEXT_PUBLIC_APP_NAME || "Upskill"}
         </Link>
 
         <nav className="flex items-center gap-1">
