@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ message: "OTP sent to your email" });
   } catch (error) {
     console.error("Checkout send OTP error:", error);
-    return NextResponse.json({ error: "Failed to send OTP" }, { status: 500 });
+    const message = error instanceof Error ? error.message : "Failed to send OTP";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

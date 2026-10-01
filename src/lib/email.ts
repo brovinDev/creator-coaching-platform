@@ -17,16 +17,12 @@ interface SendEmailOptions {
 }
 
 export async function sendEmail({ to, subject, html }: SendEmailOptions) {
-  try {
-    await transporter.sendMail({
-      from: process.env.EMAIL_FROM || "noreply@creatorplatform.com",
-      to,
-      subject,
-      html,
-    });
-  } catch (error) {
-    console.error("Failed to send email:", error);
-  }
+  await transporter.sendMail({
+    from: process.env.EMAIL_FROM || "noreply@creatorplatform.com",
+    to,
+    subject,
+    html,
+  });
 }
 
 export function otpEmail(name: string, otp: string) {
