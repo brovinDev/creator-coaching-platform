@@ -9,7 +9,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ cour
     include: { creator: { select: { name: true } } },
   });
 
-  if (!course || !course.published) {
+  if (!course) {
     return NextResponse.json({ error: "Course not found" }, { status: 404 });
   }
 
