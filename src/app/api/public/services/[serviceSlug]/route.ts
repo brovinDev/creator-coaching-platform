@@ -9,7 +9,10 @@ export async function GET(
 ) {
   const { serviceSlug } = await params;
 
-  const service = await nocodeDb.services.findUnique({ slug: serviceSlug }, SYSTEM_TOKEN);
+  let service = await nocodeDb.services.findUnique({ slug: serviceSlug }, SYSTEM_TOKEN);
+  if (!service) {
+    service = await nocodeDb.services.findUnique({ id: serviceSlug }, SYSTEM_TOKEN).catch(() => null);
+  }
   if (!service) {
     return NextResponse.json({ error: "Service not found" }, { status: 404 });
   }
@@ -37,6 +40,8 @@ export async function GET(
     slug: service.slug,
     enable_gst: service.enable_gst,
     course_id: service.course_id,
+    payment_config: service.payment_config,
+    success_config: service.success_config,
     creator: {
       name: creatorName,
       logo: logoUrl,

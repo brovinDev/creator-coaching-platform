@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
+import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,8 +32,10 @@ interface SuccessConfig {
   customButton: boolean;
   customButtonText: string;
   customButtonUrl: string;
+  hideButton: boolean;
   redirectUrl: boolean;
   redirectUrlValue: string;
+  redirectDelay: number;
 }
 
 const FIELD_TYPES = [
@@ -49,6 +52,7 @@ const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME || "Open Slate";
 export default function EditServicePage() {
   const router = useRouter();
   const params = useParams();
+  const { data: session } = useSession();
   const serviceId = params.serviceId as string;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState<Tab>("details");
@@ -84,8 +88,8 @@ export default function EditServicePage() {
   // Payment success config
   const [successConfig, setSuccessConfig] = useState<SuccessConfig>({
     customScript: false, customScriptCode: "",
-    customButton: false, customButtonText: "Go to Dashboard", customButtonUrl: "",
-    redirectUrl: false, redirectUrlValue: "",
+    customButton: false, customButtonText: "Go to Dashboard", customButtonUrl: "", hideButton: false,
+    redirectUrl: false, redirectUrlValue: "", redirectDelay: 0,
   });
 
   // Collapsible sections
@@ -273,11 +277,17 @@ export default function EditServicePage() {
 
   // Mobile preview for each tab
   function renderPreview() {
+    const creatorAvatar = (session?.user as Record<string, unknown>)?.image as string | undefined;
+    const creatorName = session?.user?.name || APP_NAME;
     const logo = (
       <div className="flex justify-center mb-4">
-        <div className="w-12 h-12 rounded-lg bg-gray-900 flex items-center justify-center text-sm font-bold text-white">
-          {APP_NAME.slice(0, 2).toUpperCase()}
-        </div>
+        {creatorAvatar ? (
+          <img src={creatorAvatar} alt={creatorName} className="w-12 h-12 rounded-lg object-cover" />
+        ) : (
+          <div className="w-12 h-12 rounded-lg bg-gray-900 flex items-center justify-center text-sm font-bold text-white">
+            {creatorName.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2)}
+          </div>
+        )}
       </div>
     );
 
@@ -354,13 +364,22 @@ export default function EditServicePage() {
           <div className="flex-1 overflow-y-auto bg-gray-100">
             {/* Logo */}
             <div className="flex justify-center pt-4 pb-0">
-              <div className="w-10 h-10 rounded-lg bg-gray-900 flex items-center justify-center text-[10px] font-bold text-white relative z-10">
-                {APP_NAME.slice(0, 2).toUpperCase()}
-              </div>
+              {creatorAvatar ? (
+                <img src={creatorAvatar} alt={creatorName} className="w-10 h-10 rounded-lg object-cover relative z-10" />
+              ) : (
+                <div className="w-10 h-10 rounded-lg bg-gray-900 flex items-center justify-center text-[10px] font-bold text-white relative z-10">
+                  {creatorName.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2)}
+                </div>
+              )}
             </div>
 
             {/* Green success banner */}
             <div className="bg-green-500 mx-3 rounded-t-xl pt-6 pb-5 px-4 text-center text-white -mt-3">
+              <div className="flex justify-center mb-2">
+                <div className="w-10 h-10 rounded-full border-2 border-white flex items-center justify-center">
+                  <Check className="h-5 w-5 text-white" />
+                </div>
+              </div>
               <p className="text-xs font-semibold">Payment Successful</p>
               <p className="text-xl font-bold mt-1">&#8377;{totalAmount}</p>
             </div>
@@ -411,11 +430,13 @@ export default function EditServicePage() {
           </div>
 
           {/* Login Now bottom bar */}
-          <div className="p-3 bg-gray-100">
-            <button className="w-full py-2.5 bg-gray-900 text-white rounded-xl text-xs font-semibold">
-              {successConfig.customButton ? (successConfig.customButtonText || "Login Now") : "Login Now"}
-            </button>
-          </div>
+          {!(successConfig.customButton && successConfig.hideButton) && (
+            <div className="p-3 bg-gray-100">
+              <button className="w-full py-2.5 bg-gray-900 text-white rounded-xl text-xs font-semibold">
+                {successConfig.customButton ? (successConfig.customButtonText || "Login Now") : "Login Now"}
+              </button>
+            </div>
+          )}
         </div>
       );
     }
@@ -548,28 +569,6 @@ export default function EditServicePage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Service description</label>
                 <Textarea placeholder="Add Service description here..." value={description} onChange={(e) => setDescription(e.target.value)} className="min-h-[160px]" />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Linked courses</label>
-                <p className="text-xs text-gray-400 mb-2">Select courses to include in this service.</p>
-                {courses.length === 0 ? (
-                  <p className="text-sm text-gray-400">No courses created yet.</p>
-                ) : (
-                  <div className="space-y-2 max-h-[240px] overflow-y-auto">
-                    {courses.map((c) => {
-                      const isSelected = courseIds.has(c.id);
-                      return (
-                        <button key={c.id} type="button" onClick={() => setCourseIds((prev) => { const next = new Set(prev); if (next.has(c.id)) next.delete(c.id); else next.add(c.id); return next; })} className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-colors text-left ${isSelected ? "border-gray-900 bg-gray-50" : "border-gray-200 hover:border-gray-300"}`}>
-                          <span className="flex-1 text-sm font-medium text-gray-900 truncate">{c.title}</span>
-                          <div className={`shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${isSelected ? "bg-gray-900 border-gray-900" : "border-gray-300"}`}>
-                            {isSelected && <Check className="h-3 w-3 text-white" />}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
               </div>
 
               <div>
@@ -758,25 +757,25 @@ export default function EditServicePage() {
                   <Toggle value={successConfig.customButton} onChange={(v) => setSuccessConfig((p) => ({ ...p, customButton: v }))} />
                 </div>
                 {successConfig.customButton && (
-                  <div className="mt-3 space-y-3">
-                    <div>
-                      <label className="text-xs text-gray-500">Button text</label>
+                  <div className="mt-3 space-y-3 border border-dashed border-gray-300 rounded-lg p-4">
+                    <div className="relative">
                       <Input
                         value={successConfig.customButtonText}
-                        onChange={(e) => setSuccessConfig((p) => ({ ...p, customButtonText: e.target.value }))}
-                        placeholder="Go to Dashboard"
-                        className="mt-1"
+                        onChange={(e) => { if (e.target.value.length <= 20) setSuccessConfig((p) => ({ ...p, customButtonText: e.target.value })); }}
+                        placeholder="Button title"
                       />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">{successConfig.customButtonText.length} / 20</span>
                     </div>
-                    <div>
-                      <label className="text-xs text-gray-500">Button URL</label>
-                      <Input
-                        value={successConfig.customButtonUrl}
-                        onChange={(e) => setSuccessConfig((p) => ({ ...p, customButtonUrl: e.target.value }))}
-                        placeholder="https://..."
-                        className="mt-1"
-                      />
-                    </div>
+                    <Input
+                      value={successConfig.customButtonUrl}
+                      onChange={(e) => setSuccessConfig((p) => ({ ...p, customButtonUrl: e.target.value }))}
+                      placeholder="Button url"
+                    />
+                    <label className="flex items-center gap-2 text-sm text-gray-700">
+                      <input type="checkbox" checked={successConfig.hideButton} onChange={(e) => setSuccessConfig((p) => ({ ...p, hideButton: e.target.checked }))} className="rounded border-gray-300" />
+                      Hide button
+                      <span className="text-gray-400 text-xs cursor-help" title="Hide the button on the success page">&#9432;</span>
+                    </label>
                   </div>
                 )}
               </div>
@@ -791,14 +790,22 @@ export default function EditServicePage() {
                   <Toggle value={successConfig.redirectUrl} onChange={(v) => setSuccessConfig((p) => ({ ...p, redirectUrl: v }))} />
                 </div>
                 {successConfig.redirectUrl && (
-                  <div className="mt-3">
-                    <label className="text-xs text-gray-500">Redirect to</label>
+                  <div className="mt-3 space-y-3 border border-dashed border-gray-300 rounded-lg p-4">
                     <Input
                       value={successConfig.redirectUrlValue}
                       onChange={(e) => setSuccessConfig((p) => ({ ...p, redirectUrlValue: e.target.value }))}
-                      placeholder="https://..."
-                      className="mt-1"
+                      placeholder="Redirect URL"
                     />
+                    <div>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={10}
+                        value={successConfig.redirectDelay}
+                        onChange={(e) => setSuccessConfig((p) => ({ ...p, redirectDelay: Math.min(10, Math.max(0, Number(e.target.value) || 0)) }))}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Max 10 seconds / Min 0</p>
+                    </div>
                   </div>
                 )}
               </div>

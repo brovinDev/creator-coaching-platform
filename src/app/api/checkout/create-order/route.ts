@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     }
 
     const token = await getNocodeToken();
-    const { courseId, serviceId, amount, couponId } = await req.json();
+    const { courseId, serviceId, amount, couponId, customFields } = await req.json();
 
     if (!courseId) {
       return NextResponse.json({ error: "Course ID is required" }, { status: 400 });
@@ -76,6 +76,7 @@ export async function POST(req: NextRequest) {
         status: "pending",
         razorpay_order_id: razorpayOrder.id,
         coupon_id: couponId || null,
+        custom_fields: customFields ? JSON.stringify(customFields) : null,
       },
       token
     );

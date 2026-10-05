@@ -14,6 +14,16 @@ import toast from "react-hot-toast";
 
 const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME || "Open Slate";
 
+interface CustomField {
+  id: string;
+  type: string;
+  title: string;
+  helpText?: string;
+  hidden?: boolean;
+  optional?: boolean;
+  options?: string[];
+}
+
 interface ServiceData {
   id: string;
   courseId: string;
@@ -26,6 +36,7 @@ interface ServiceData {
   serviceType: string;
   slug: string;
   creator: { name: string; logo: string | null };
+  customFields: CustomField[];
 }
 
 declare global {
@@ -57,6 +68,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
     couponId: string; code: string; discount_type: string; discount_value: number;
   } | null>(null);
   const [applyingCoupon, setApplyingCoupon] = useState(false);
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
 
   useEffect(() => { fetchService(); }, [courseSlug]);
 
@@ -80,6 +92,11 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
       const s = await serviceRes.json();
       const courseIdStr = String(s.course_id || "");
       const firstCourseId = courseIdStr.split(",").filter(Boolean)[0]?.trim() || "";
+      let customFields: CustomField[] = [];
+      try {
+        const pc = typeof s.payment_config === "string" ? JSON.parse(s.payment_config) : s.payment_config;
+        if (pc?.customFields) customFields = pc.customFields.filter((f: CustomField) => !f.hidden);
+      } catch { /* ignore */ }
       setService({
         id: s.id, courseId: firstCourseId,
         title: s.title || "", description: s.description || "",
@@ -89,6 +106,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
         enableGst: !!s.enable_gst, serviceType: s.service_type || "one-time",
         slug: s.slug || "",
         creator: s.creator || { name: "Creator", logo: null },
+        customFields,
       });
       setLoading(false);
       return;
@@ -103,6 +121,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
         price: Number(c.price) || 0, discountedPrice: null,
         enableGst: false, serviceType: "one-time", slug: c.slug || "",
         creator: c.creator || { name: "Creator", logo: null },
+        customFields: [],
       });
       setLoading(false);
       return;
@@ -232,15 +251,18 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
   async function handlePayment() {
     if (!service) return;
     if (authStep !== "done") { toast.error("Please sign in or create an account first"); return; }
+    const requiredFields = service.customFields.filter((f) => !f.optional);
+    const missingField = requiredFields.find((f) => !customFieldValues[f.id]?.trim());
+    if (missingField) { toast.error(`Please fill in "${missingField.title}"`); return; }
     setSubmitting(true);
     try {
       if (isFree) {
         const res = await fetch("/api/checkout/free-enroll", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ courseId: service.courseId, serviceId: service.id, couponId: appliedCoupon?.couponId }),
+          body: JSON.stringify({ courseId: service.courseId, serviceId: service.id, couponId: appliedCoupon?.couponId, customFields: customFieldValues }),
         });
         if (res.ok) {
-          const p = new URLSearchParams({ amount: "0", service: service.title, method: "Free" });
+          const p = new URLSearchParams({ amount: "0", service: service.title, method: "Free", sid: service.id });
           router.push(`/payment-success?${p.toString()}`);
         } else { const data = await res.json(); toast.error(data.error || "Enrollment failed"); }
         setSubmitting(false);
@@ -248,7 +270,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
       }
       const orderRes = await fetch("/api/checkout/create-order", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ courseId: service.courseId, serviceId: service.id, amount: totalAmount, couponId: appliedCoupon?.couponId }),
+        body: JSON.stringify({ courseId: service.courseId, serviceId: service.id, amount: totalAmount, couponId: appliedCoupon?.couponId, customFields: customFieldValues }),
       });
       const orderData = await orderRes.json();
       if (!orderRes.ok) { toast.error(orderData.error || "Failed to create order"); setSubmitting(false); return; }
@@ -264,7 +286,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
           });
           if (verifyRes.ok) {
             const vd = await verifyRes.json();
-            const p = new URLSearchParams({ txn: vd.transactionId || response.razorpay_payment_id, amount: String(vd.amount || ""), service: vd.serviceName || "", method: vd.paymentMethod || "Razorpay" });
+            const p = new URLSearchParams({ txn: vd.transactionId || response.razorpay_payment_id, amount: String(vd.amount || ""), service: vd.serviceName || "", method: vd.paymentMethod || "Razorpay", sid: service.id });
             router.push(`/payment-success?${p.toString()}`);
           } else router.push("/payment-failed");
         },
@@ -420,6 +442,49 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
                   <div className="mt-5 flex items-center gap-2 px-4 py-2.5 bg-green-50 border border-green-200 rounded-lg">
                     <CheckCircle className="h-4 w-4 text-green-600 shrink-0" />
                     <span className="text-sm text-green-700 truncate">{form.email || session?.user?.email}</span>
+                  </div>
+                )}
+
+                {/* Custom Fields */}
+                {service.customFields.length > 0 && (
+                  <div className="mt-5 space-y-3">
+                    {service.customFields.map((field) => (
+                      <div key={field.id}>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          {field.title}{!field.optional && <span className="text-red-500 ml-0.5">*</span>}
+                        </label>
+                        {field.type === "long_text" ? (
+                          <textarea
+                            placeholder={field.helpText || field.title}
+                            value={customFieldValues[field.id] || ""}
+                            onChange={(e) => setCustomFieldValues({ ...customFieldValues, [field.id]: e.target.value })}
+                            required={!field.optional}
+                            rows={3}
+                            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm placeholder:text-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          />
+                        ) : field.type === "dropdown" ? (
+                          <select
+                            value={customFieldValues[field.id] || ""}
+                            onChange={(e) => setCustomFieldValues({ ...customFieldValues, [field.id]: e.target.value })}
+                            required={!field.optional}
+                            className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm bg-white focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          >
+                            <option value="">Select {field.title}</option>
+                            {field.options?.map((opt) => (
+                              <option key={opt} value={opt}>{opt}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <Input
+                            type={field.type === "number" ? "number" : field.type === "email" ? "email" : field.type === "phone" ? "tel" : "text"}
+                            placeholder={field.helpText || field.title}
+                            value={customFieldValues[field.id] || ""}
+                            onChange={(e) => setCustomFieldValues({ ...customFieldValues, [field.id]: e.target.value })}
+                            required={!field.optional}
+                          />
+                        )}
+                      </div>
+                    ))}
                   </div>
                 )}
 

@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
     }
 
     const token = await getNocodeToken();
-    const { courseId, serviceId, couponId } = await req.json();
+    const { courseId, serviceId, couponId, customFields } = await req.json();
 
     if (!courseId && !serviceId) {
       return NextResponse.json({ error: "Course ID or Service ID is required" }, { status: 400 });
@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Already enrolled" }, { status: 400 });
       }
       await nocodeDb.enrollments.create(
-        { user_id: session.user.id, service_id: serviceId },
+        { user_id: session.user.id, service_id: serviceId, custom_fields: customFields ? JSON.stringify(customFields) : null },
         token
       );
     } else {
@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Already enrolled" }, { status: 400 });
       }
       await nocodeDb.enrollments.create(
-        { user_id: session.user.id, course_id: courseId },
+        { user_id: session.user.id, course_id: courseId, custom_fields: customFields ? JSON.stringify(customFields) : null },
         token
       );
     }

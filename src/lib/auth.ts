@@ -34,6 +34,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             id: user.id,
             name,
             email: user.email,
+            image: (profile?.avatar as string) || null,
             role: (profile?.role as string) || "STUDENT",
             nocodeToken: user.jwt,
           };
