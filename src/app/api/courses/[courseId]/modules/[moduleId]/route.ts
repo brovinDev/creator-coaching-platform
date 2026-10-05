@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { auth, getNocodeToken } from "@/lib/auth";
+import { nocodeDb } from "@/lib/nocode/db";
 
 type Params = { params: Promise<{ courseId: string; moduleId: string }> };
 
@@ -11,16 +11,19 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const course = await db.course.findUnique({ where: { id: courseId, creatorId: session.user.id } });
+  const token = await getNocodeToken();
+  const course = await nocodeDb.courses.findUnique({ id: courseId, creator_id: session.user.id }, token);
   if (!course) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const { title } = await req.json();
-  const updated = await db.courseModule.update({
-    where: { id: moduleId },
-    data: { title },
-  });
+  const updated = await nocodeDb.courseModules.update(moduleId, { title }, token);
 
-  return NextResponse.json(updated);
+  return NextResponse.json({
+    id: updated.id ?? moduleId,
+    title: updated.title ?? title,
+    position: updated.position,
+    courseId: updated.course_id ?? courseId,
+  });
 }
 
 export async function DELETE(req: NextRequest, { params }: Params) {
@@ -30,9 +33,12 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const course = await db.course.findUnique({ where: { id: courseId, creatorId: session.user.id } });
+  const token = await getNocodeToken();
+  const course = await nocodeDb.courses.findUnique({ id: courseId, creator_id: session.user.id }, token);
   if (!course) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  await db.courseModule.delete({ where: { id: moduleId } });
+  await nocodeDb.lessons.deleteWhere({ module_id: moduleId }, token);
+  await nocodeDb.courseModules.delete(moduleId, token);
+
   return NextResponse.json({ message: "Deleted" });
 }

@@ -1,7 +1,7 @@
 import nodemailer from "nodemailer";
 
 const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
+  host: process.env.SMTP_HOST || "smtp.gmail.com",
   port: Number(process.env.SMTP_PORT) || 587,
   secure: false,
   auth: {
@@ -18,7 +18,7 @@ interface SendEmailOptions {
 
 export async function sendEmail({ to, subject, html }: SendEmailOptions) {
   await transporter.sendMail({
-    from: process.env.EMAIL_FROM || "noreply@creatorplatform.com",
+    from: process.env.EMAIL_FROM || process.env.SMTP_USER,
     to,
     subject,
     html,
@@ -36,7 +36,7 @@ export function otpEmail(name: string, otp: string) {
           <div style="margin-bottom: 8px;">
             ${otp.split("").map((d) => `<span style="display: inline-block; width: 40px; height: 48px; line-height: 48px; margin: 0 3px; background: white; border-radius: 8px; font-size: 28px; font-weight: bold; color: #4f46e5; border: 2px solid #e0e7ff;">${d}</span>`).join("")}
           </div>
-          <p style="margin: 12px 0 0; font-size: 13px; color: #6b7280;">Tap and hold to copy → <span style="user-select: all; -webkit-user-select: all; font-weight: bold; color: #4f46e5; letter-spacing: 2px; padding: 2px 8px; background: white; border-radius: 4px;">${otp}</span></p>
+          <p style="margin: 12px 0 0; font-size: 13px; color: #6b7280;">Tap and hold to copy: <span style="user-select: all; -webkit-user-select: all; font-weight: bold; color: #4f46e5; letter-spacing: 2px; padding: 2px 8px; background: white; border-radius: 4px;">${otp}</span></p>
         </div>
         <p style="color: #666;">This code expires in 10 minutes. If you didn't request this, ignore this email.</p>
       </div>
@@ -104,7 +104,7 @@ export function creatorPurchaseNotificationEmail(creatorName: string, studentNam
     subject: `New Purchase: ${courseName}`,
     html: `
       <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-        <h1 style="color: #1a1a1a;">New Sale! 🎉</h1>
+        <h1 style="color: #1a1a1a;">New Sale!</h1>
         <p>Hi ${creatorName}, ${studentName} just purchased <strong>${courseName}</strong> for ₹${amount}.</p>
         <a href="${process.env.NEXT_PUBLIC_APP_URL}/creator/payments" style="display: inline-block; padding: 12px 24px; background: #6366f1; color: white; text-decoration: none; border-radius: 6px;">View Payments</a>
       </div>

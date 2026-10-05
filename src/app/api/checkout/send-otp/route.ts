@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { nocodeDb } from "@/lib/nocode/db";
 import { sendEmail, otpEmail } from "@/lib/email";
+
+const SYSTEM_TOKEN = process.env.NOCODE_SYSTEM_TOKEN || "";
 
 export async function POST(req: NextRequest) {
   try {
@@ -12,18 +14,19 @@ export async function POST(req: NextRequest) {
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-    await db.emailOtp.deleteMany({ where: { email, verified: false } });
+    await nocodeDb.emailOtps.deleteWhere({ email, verified: false }, SYSTEM_TOKEN);
 
-    await db.emailOtp.create({
-      data: {
+    await nocodeDb.emailOtps.create(
+      {
         email,
         otp,
         name,
         password: "",
         role: "STUDENT",
-        expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+        expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
       },
-    });
+      SYSTEM_TOKEN
+    );
 
     const emailContent = otpEmail(name, otp);
     await sendEmail({ to: email, ...emailContent });

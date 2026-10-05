@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
-import { db } from "@/lib/db";
+import { nocodeDb } from "@/lib/nocode/db";
+import { nocodeSignup } from "@/lib/nocode/client";
 import { sendEmail } from "@/lib/email";
+
+const SYSTEM_TOKEN = process.env.NOCODE_SYSTEM_TOKEN || "";
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,35 +17,54 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Password must be at least 6 characters" }, { status: 400 });
     }
 
-    const existing = await db.user.findUnique({ where: { email } });
-    if (existing) {
-      return NextResponse.json({ error: "Account already exists. Please sign in instead." }, { status: 400 });
-    }
+    const records = await nocodeDb.emailOtps.findMany(
+      { where: { email, otp, verified: false } },
+      SYSTEM_TOKEN
+    );
 
-    const record = await db.emailOtp.findFirst({
-      where: {
-        email,
-        otp,
-        verified: false,
-        expiresAt: { gt: new Date() },
-      },
-    });
+    const record = records.find(
+      (r) => new Date(r.expires_at as string) > new Date()
+    );
 
     if (!record) {
       return NextResponse.json({ error: "Invalid or expired OTP" }, { status: 400 });
     }
 
-    await db.emailOtp.update({
-      where: { id: record.id },
-      data: { verified: true },
-    });
+    await nocodeDb.emailOtps.update(
+      String(record.id),
+      { verified: true },
+      SYSTEM_TOKEN
+    );
 
-    const passwordHash = await bcrypt.hash(password, 12);
-    await db.user.create({
-      data: { name, email, passwordHash, role: "STUDENT", emailVerified: new Date() },
-    });
+    const nameParts = name.trim().split(/\s+/);
+    const firstName = nameParts[0] || name;
+    const lastName = nameParts.slice(1).join(" ") || "";
 
-    await db.emailOtp.deleteMany({ where: { email } });
+    try {
+      const signupRes = await nocodeSignup({
+        email,
+        password,
+        first_name: firstName,
+        last_name: lastName,
+      });
+
+      if ((signupRes as { success: boolean }).success) {
+        const userData = (signupRes as { data?: { id?: string } }).data;
+        if (userData?.id) {
+          await nocodeDb.userProfiles.create(
+            { user_id: userData.id, role: "STUDENT" },
+            SYSTEM_TOKEN
+          );
+        }
+      }
+    } catch (err) {
+      const msg = (err as Error).message || "";
+      if (!msg.includes("already") && !msg.includes("exists")) {
+        throw err;
+      }
+    }
+
+    await nocodeDb.emailOtps.deleteWhere({ email }, SYSTEM_TOKEN);
 
     await sendEmail({
       to: email,

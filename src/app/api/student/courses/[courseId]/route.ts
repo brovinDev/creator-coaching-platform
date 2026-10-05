@@ -1,31 +1,54 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { auth, getNocodeToken } from "@/lib/auth";
+import { nocodeDb } from "@/lib/nocode/db";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ courseId: string }> }) {
   const { courseId } = await params;
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const enrollment = await db.enrollment.findUnique({
-    where: { userId_courseId: { userId: session.user.id, courseId } },
-  });
+  const token = await getNocodeToken();
 
+  const enrollment = await nocodeDb.enrollments.findUnique(
+    { user_id: session.user.id, course_id: courseId },
+    token
+  );
   if (!enrollment) {
     return NextResponse.json({ error: "Not enrolled" }, { status: 403 });
   }
 
-  const course = await db.course.findUnique({
-    where: { id: courseId },
-    include: {
-      modules: {
-        orderBy: { position: "asc" },
-        include: {
-          lessons: { orderBy: { position: "asc" } },
-        },
-      },
-    },
-  });
+  const course = await nocodeDb.courses.findUnique({ id: courseId }, token);
+  if (!course) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  return NextResponse.json(course);
+  const modules = await nocodeDb.courseModules.findMany(
+    { where: { course_id: courseId }, orderBy: { position: "asc" } },
+    token
+  );
+
+  const modulesWithLessons = await Promise.all(
+    modules.map(async (m) => {
+      const lessons = await nocodeDb.lessons.findMany(
+        { where: { module_id: String(m.id) }, orderBy: { position: "asc" } },
+        token
+      );
+      return {
+        id: m.id,
+        title: m.title,
+        lessons: lessons.map((l) => ({
+          id: l.id,
+          title: l.title,
+          content: l.content,
+          videoUrl: l.video_url,
+          thumbnail: l.thumbnail,
+        })),
+      };
+    })
+  );
+
+  return NextResponse.json({
+    id: course.id,
+    title: course.title,
+    description: course.description,
+    modules: modulesWithLessons,
+  });
 }

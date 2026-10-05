@@ -1,40 +1,74 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { auth, getNocodeToken } from "@/lib/auth";
+import { nocodeDb } from "@/lib/nocode/db";
 
 export async function GET() {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const token = await getNocodeToken();
+
   if (session.user.role === "CREATOR") {
-    const community = await db.community.findUnique({
-      where: { creatorId: session.user.id },
-      include: {
-        channels: {
-          orderBy: { position: "asc" },
-          include: { _count: { select: { posts: true } } },
-        },
-      },
-    });
-    return NextResponse.json(community ? [community] : []);
+    const communities = await nocodeDb.communities.findMany(
+      { where: { creator_id: session.user.id } },
+      token
+    );
+    if (communities.length === 0) return NextResponse.json([]);
+
+    const community = communities[0];
+    const channels = await nocodeDb.communityChannels.findMany(
+      { where: { community_id: String(community.id) }, orderBy: { position: "asc" } },
+      token
+    );
+
+    const channelsWithCount = await Promise.all(
+      channels.map(async (ch) => {
+        const postCount = await nocodeDb.communityPosts.count({ channel_id: String(ch.id) }, token);
+        return { ...ch, _count: { posts: postCount } };
+      })
+    );
+
+    return NextResponse.json([{ ...community, channels: channelsWithCount }]);
   }
 
-  const enrollments = await db.enrollment.findMany({
-    where: { userId: session.user.id },
-    include: { course: { select: { creatorId: true } } },
-  });
+  const enrollments = await nocodeDb.enrollments.findMany(
+    { where: { user_id: session.user.id } },
+    token
+  );
 
-  const creatorIds = [...new Set(enrollments.map((e) => e.course.creatorId))];
+  if (enrollments.length === 0) return NextResponse.json([]);
 
-  const communities = await db.community.findMany({
-    where: { creatorId: { in: creatorIds } },
-    include: {
-      channels: {
-        orderBy: { position: "asc" },
-        include: { _count: { select: { posts: true } } },
-      },
-    },
-  });
+  const courseIds = enrollments.map((e) => String(e.course_id));
+  const courses = await Promise.all(
+    courseIds.map((cid) => nocodeDb.courses.findUnique({ id: cid }, token))
+  );
 
-  return NextResponse.json(communities);
+  const creatorIds = [...new Set(courses.filter(Boolean).map((c) => String(c!.creator_id)))];
+
+  const allCommunities = await Promise.all(
+    creatorIds.map(async (cid) => {
+      const comms = await nocodeDb.communities.findMany({ where: { creator_id: cid } }, token);
+      return comms;
+    })
+  );
+
+  const communities = allCommunities.flat();
+
+  const communitiesWithChannels = await Promise.all(
+    communities.map(async (community) => {
+      const channels = await nocodeDb.communityChannels.findMany(
+        { where: { community_id: String(community.id) }, orderBy: { position: "asc" } },
+        token
+      );
+      const channelsWithCount = await Promise.all(
+        channels.map(async (ch) => {
+          const postCount = await nocodeDb.communityPosts.count({ channel_id: String(ch.id) }, token);
+          return { ...ch, _count: { posts: postCount } };
+        })
+      );
+      return { ...community, channels: channelsWithCount };
+    })
+  );
+
+  return NextResponse.json(communitiesWithChannels);
 }

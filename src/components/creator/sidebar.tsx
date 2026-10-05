@@ -6,6 +6,7 @@ import { signOut } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
+  Briefcase,
   BookOpen,
   FileText,
   Users,
@@ -20,6 +21,7 @@ import { useState } from "react";
 
 const navItems = [
   { label: "Overview", href: "/creator", icon: LayoutDashboard },
+  { label: "Services", href: "/creator/services", icon: Briefcase },
   { label: "Courses", href: "/creator/courses", icon: BookOpen },
   { label: "Landing Pages", href: "/creator/landing-pages", icon: FileText },
   { label: "Community", href: "/creator/community", icon: MessageSquare },
@@ -60,7 +62,7 @@ export function CreatorSidebar({ user }: SidebarProps) {
       >
         <div className="flex items-center justify-between px-6 py-5">
           <Link href="/creator" className="text-lg font-bold text-indigo-600">
-            {process.env.NEXT_PUBLIC_APP_NAME || "Upskill"}
+            {process.env.NEXT_PUBLIC_APP_NAME || "Open Slate"}
           </Link>
           <button onClick={() => setMobileOpen(false)} className="lg:hidden hover:bg-gray-100 rounded-lg p-1 transition-colors">
             <X className="h-5 w-5" />

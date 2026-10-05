@@ -1,12 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { verifyRazorpaySignature } from "@/lib/razorpay";
+import { nocodeDb } from "@/lib/nocode/db";
+import crypto from "crypto";
 import {
   sendEmail,
   paymentConfirmationEmail,
   enrollmentEmail,
   creatorPurchaseNotificationEmail,
 } from "@/lib/email";
+
+const SYSTEM_TOKEN = process.env.NOCODE_SYSTEM_TOKEN || "";
+
+function verifyRazorpaySignature(orderId: string, paymentId: string, signature: string): boolean {
+  const body = orderId + "|" + paymentId;
+  const expectedSignature = crypto
+    .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET!)
+    .update(body)
+    .digest("hex");
+  return expectedSignature === signature;
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -21,55 +32,63 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid payment signature" }, { status: 400 });
     }
 
-    const order = await db.order.findUnique({
-      where: { razorpayOrderId },
-      include: {
-        user: true,
-        course: { include: { creator: true } },
-      },
-    });
-
+    const order = await nocodeDb.orders.findUnique({ razorpay_order_id: razorpayOrderId }, SYSTEM_TOKEN);
     if (!order) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
     if (order.status === "paid") {
-      return NextResponse.json({ message: "Payment already processed", courseSlug: order.course.slug });
+      const course = await nocodeDb.courses.findUnique({ id: String(order.course_id) }, SYSTEM_TOKEN);
+      return NextResponse.json({ message: "Payment already processed", courseSlug: course?.slug });
     }
 
-    await db.order.update({
-      where: { id: order.id },
-      data: {
-        status: "paid",
-        razorpayPaymentId,
-        razorpaySignature,
-      },
-    });
-
-    await db.enrollment.create({
-      data: {
-        userId: order.userId,
-        courseId: order.courseId,
-      },
-    });
-
-    const paymentEmail = paymentConfirmationEmail(order.user.name, order.course.title, order.amount);
-    sendEmail({ to: order.user.email, ...paymentEmail });
-
-    const enrollEmail = enrollmentEmail(order.user.name, order.course.title);
-    sendEmail({ to: order.user.email, ...enrollEmail });
-
-    const creatorEmail = creatorPurchaseNotificationEmail(
-      order.course.creator.name,
-      order.user.name,
-      order.course.title,
-      order.amount
+    await nocodeDb.orders.update(
+      String(order.id),
+      { status: "paid", razorpay_payment_id: razorpayPaymentId, razorpay_signature: razorpaySignature },
+      SYSTEM_TOKEN
     );
-    sendEmail({ to: order.course.creator.email, ...creatorEmail });
+
+    await nocodeDb.enrollments.create(
+      { user_id: String(order.user_id), course_id: String(order.course_id) },
+      SYSTEM_TOKEN
+    );
+
+    const course = await nocodeDb.courses.findUnique({ id: String(order.course_id) }, SYSTEM_TOKEN);
+    const userProfile = await nocodeDb.userProfiles.findUnique({ user_id: String(order.user_id) }, SYSTEM_TOKEN);
+
+    const userName = (userProfile?.name as string) || "Student";
+    const userEmail = (userProfile?.email as string) || "";
+    const courseTitle = (course?.title as string) || "Course";
+    const courseSlug = (course?.slug as string) || "";
+    const amount = Number(order.amount) || 0;
+
+    if (userEmail) {
+      const paymentEmail = paymentConfirmationEmail(userName, courseTitle, amount);
+      sendEmail({ to: userEmail, ...paymentEmail });
+
+      const enrollEmail = enrollmentEmail(userName, courseTitle);
+      sendEmail({ to: userEmail, ...enrollEmail });
+    }
+
+    if (course?.creator_id) {
+      const creatorProfile = await nocodeDb.userProfiles.findUnique(
+        { user_id: String(course.creator_id) },
+        SYSTEM_TOKEN
+      );
+      if (creatorProfile?.email) {
+        const creatorEmail = creatorPurchaseNotificationEmail(
+          (creatorProfile.name as string) || "Creator",
+          userName,
+          courseTitle,
+          amount
+        );
+        sendEmail({ to: creatorProfile.email as string, ...creatorEmail });
+      }
+    }
 
     return NextResponse.json({
       message: "Payment verified and enrollment created",
-      courseSlug: order.course.slug,
+      courseSlug,
     });
   } catch (error) {
     console.error("Verify payment error:", error);

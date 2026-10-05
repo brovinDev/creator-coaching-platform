@@ -90,15 +90,19 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
   async function saveCourse() {
     setSaving(true);
     try {
-      await fetch(`/api/courses/${courseId}`, {
+      const res = await fetch(`/api/courses/${courseId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to save");
+      }
       toast.success("Course saved!");
       fetchCourse();
-    } catch {
-      toast.error("Failed to save");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save");
     } finally {
       setSaving(false);
     }
@@ -205,13 +209,13 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
             id="title"
             label="Title"
             value={form.title}
-            onChange={(e) => setForm({ ...form, title: e.target.value })}
+            onChange={(e) => setForm(prev => ({ ...prev, title: e.target.value }))}
           />
           <Textarea
             id="description"
             label="Description"
             value={form.description}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
+            onChange={(e) => setForm(prev => ({ ...prev, description: e.target.value }))}
             rows={4}
           />
           <Input
@@ -220,14 +224,14 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
             type="number"
             min={0}
             value={form.price}
-            onChange={(e) => setForm({ ...form, price: Number(e.target.value) })}
+            onChange={(e) => setForm(prev => ({ ...prev, price: Number(e.target.value) }))}
           />
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Thumbnail</label>
             <FileUpload
               type="image"
               value={form.thumbnail}
-              onChange={(url) => setForm({ ...form, thumbnail: url })}
+              onChange={(url) => setForm(prev => ({ ...prev, thumbnail: url }))}
             />
           </div>
           <div className="flex justify-end">
@@ -360,7 +364,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
             label="Lesson Title"
             placeholder="e.g., Introduction"
             value={lessonForm.title}
-            onChange={(e) => setLessonForm({ ...lessonForm, title: e.target.value })}
+            onChange={(e) => setLessonForm(prev => ({ ...prev, title: e.target.value }))}
             required
           />
           <div>
@@ -389,14 +393,14 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
               <FileUpload
                 type="video"
                 value={lessonForm.videoUrl}
-                onChange={(url) => setLessonForm({ ...lessonForm, videoUrl: url })}
+                onChange={(url) => setLessonForm(prev => ({ ...prev, videoUrl: url }))}
               />
             ) : (
               <Input
                 id="lesson-video"
                 placeholder="https://youtube.com/... or video URL"
                 value={lessonForm.videoUrl}
-                onChange={(e) => setLessonForm({ ...lessonForm, videoUrl: e.target.value })}
+                onChange={(e) => setLessonForm(prev => ({ ...prev, videoUrl: e.target.value }))}
               />
             )}
           </div>
@@ -405,7 +409,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
             <FileUpload
               type="image"
               value={lessonForm.thumbnail}
-              onChange={(url) => setLessonForm({ ...lessonForm, thumbnail: url })}
+              onChange={(url) => setLessonForm(prev => ({ ...prev, thumbnail: url }))}
             />
           </div>
           <Textarea
@@ -413,7 +417,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
             label="Content (optional)"
             placeholder="Lesson notes, text content..."
             value={lessonForm.content}
-            onChange={(e) => setLessonForm({ ...lessonForm, content: e.target.value })}
+            onChange={(e) => setLessonForm(prev => ({ ...prev, content: e.target.value }))}
             rows={4}
           />
           <div className="flex justify-end gap-3">
@@ -439,7 +443,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
             id="edit-lesson-title"
             label="Lesson Title"
             value={lessonForm.title}
-            onChange={(e) => setLessonForm({ ...lessonForm, title: e.target.value })}
+            onChange={(e) => setLessonForm(prev => ({ ...prev, title: e.target.value }))}
             required
           />
           <div>
@@ -468,14 +472,14 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
               <FileUpload
                 type="video"
                 value={lessonForm.videoUrl}
-                onChange={(url) => setLessonForm({ ...lessonForm, videoUrl: url })}
+                onChange={(url) => setLessonForm(prev => ({ ...prev, videoUrl: url }))}
               />
             ) : (
               <Input
                 id="edit-lesson-video"
                 placeholder="https://youtube.com/... or video URL"
                 value={lessonForm.videoUrl}
-                onChange={(e) => setLessonForm({ ...lessonForm, videoUrl: e.target.value })}
+                onChange={(e) => setLessonForm(prev => ({ ...prev, videoUrl: e.target.value }))}
               />
             )}
           </div>
@@ -484,14 +488,14 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
             <FileUpload
               type="image"
               value={lessonForm.thumbnail}
-              onChange={(url) => setLessonForm({ ...lessonForm, thumbnail: url })}
+              onChange={(url) => setLessonForm(prev => ({ ...prev, thumbnail: url }))}
             />
           </div>
           <Textarea
             id="edit-lesson-content"
             label="Content"
             value={lessonForm.content}
-            onChange={(e) => setLessonForm({ ...lessonForm, content: e.target.value })}
+            onChange={(e) => setLessonForm(prev => ({ ...prev, content: e.target.value }))}
             rows={4}
           />
           <div className="flex justify-end gap-3">
