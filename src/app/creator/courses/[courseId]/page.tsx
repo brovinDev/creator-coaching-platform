@@ -105,6 +105,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
   // Drag-and-drop reorder state
   const dragItemRef = useRef<{ moduleId: string; lessonIdx: number } | null>(null);
   const [dragOverTarget, setDragOverTarget] = useState<{ moduleId: string; lessonIdx: number } | null>(null);
+  const [draggingLesson, setDraggingLesson] = useState<string | null>(null);
 
   useEffect(() => { fetchCourse(); }, [courseId]);
 
@@ -439,15 +440,26 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
                       const isExpanded = expandedChapters.has(lesson.id);
                       const isEditingDesc = editingDescription?.lessonId === lesson.id;
                       const isDragOver = dragOverTarget?.moduleId === mod.id && dragOverTarget?.lessonIdx === lessonIdx;
+                      const isDragging = draggingLesson === lesson.id;
+                      const dragFromAbove = dragItemRef.current && dragItemRef.current.moduleId === mod.id && dragItemRef.current.lessonIdx < lessonIdx;
                       return (
                         <div
                           key={lesson.id}
-                          className={`mb-2 ${isDragOver ? "border-t-2 border-indigo-500" : ""}`}
+                          data-chapter
+                          className="transition-transform duration-200 ease-in-out"
+                          style={{
+                            marginBottom: 8,
+                            transform: isDragOver ? (dragFromAbove ? "translateY(4px)" : "translateY(-4px)") : "translateY(0)",
+                          }}
                           onDragOver={(e) => {
                             e.preventDefault();
-                            if (dragItemRef.current?.moduleId === mod.id) {
+                            e.dataTransfer.dropEffect = "move";
+                            if (dragItemRef.current?.moduleId === mod.id && dragItemRef.current.lessonIdx !== lessonIdx) {
                               setDragOverTarget({ moduleId: mod.id, lessonIdx });
                             }
+                          }}
+                          onDragLeave={() => {
+                            if (dragOverTarget?.lessonIdx === lessonIdx) setDragOverTarget(null);
                           }}
                           onDrop={(e) => {
                             e.preventDefault();
@@ -456,11 +468,21 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
                             }
                             dragItemRef.current = null;
                             setDragOverTarget(null);
+                            setDraggingLesson(null);
                           }}
                         >
+                          {/* Drop indicator line */}
+                          {isDragOver && !dragFromAbove && (
+                            <div className="h-0.5 bg-indigo-500 rounded-full mb-1.5 mx-2 transition-all duration-200" />
+                          )}
+
                           {/* Chapter header row */}
                           <div
-                            className="flex items-center justify-between py-2.5 px-3 bg-white/80 border border-gray-200 rounded-lg cursor-pointer hover:bg-white transition-colors"
+                            className={`flex items-center justify-between py-2.5 px-3 border rounded-lg cursor-pointer transition-all duration-200 ${
+                              isDragging
+                                ? "bg-indigo-50 border-indigo-300 opacity-50 scale-[0.98]"
+                                : "bg-white/80 border-gray-200 hover:bg-white"
+                            }`}
                             onClick={() => toggleChapter(lesson.id)}
                           >
                             <div className="flex items-center gap-2">
@@ -468,14 +490,20 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
                                 draggable
                                 onDragStart={(e) => {
                                   dragItemRef.current = { moduleId: mod.id, lessonIdx };
+                                  setDraggingLesson(lesson.id);
                                   e.dataTransfer.effectAllowed = "move";
+                                  const el = e.currentTarget.closest("[data-chapter]") as HTMLElement;
+                                  if (el) {
+                                    e.dataTransfer.setDragImage(el, 20, 20);
+                                  }
                                 }}
                                 onDragEnd={() => {
                                   dragItemRef.current = null;
                                   setDragOverTarget(null);
+                                  setDraggingLesson(null);
                                 }}
                                 onClick={(e) => e.stopPropagation()}
-                                className="cursor-grab active:cursor-grabbing p-0.5 -ml-1 text-gray-300 hover:text-gray-500"
+                                className="cursor-grab active:cursor-grabbing p-0.5 -ml-1 text-gray-300 hover:text-gray-500 transition-colors"
                               >
                                 <GripVertical className="h-4 w-4" />
                               </div>
@@ -716,6 +744,11 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
                                 </div>
                               )}
                             </div>
+                          )}
+
+                          {/* Bottom drop indicator */}
+                          {isDragOver && dragFromAbove && (
+                            <div className="h-0.5 bg-indigo-500 rounded-full mt-1.5 mx-2 transition-all duration-200" />
                           )}
                         </div>
                       );
