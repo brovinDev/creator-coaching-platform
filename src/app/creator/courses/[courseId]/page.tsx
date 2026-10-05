@@ -107,7 +107,10 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
   const [dragOverTarget, setDragOverTarget] = useState<{ moduleId: string; lessonIdx: number } | null>(null);
   const [draggingLesson, setDraggingLesson] = useState<string | null>(null);
 
-  useEffect(() => { fetchCourse(); }, [courseId]);
+  // Linked service for "Preview Changes"
+  const [serviceSlug, setServiceSlug] = useState<string | null>(null);
+
+  useEffect(() => { fetchCourse(); fetchLinkedService(); }, [courseId]);
 
   async function fetchCourse() {
     const res = await fetch(`/api/courses/${courseId}`);
@@ -117,6 +120,17 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
     setForm({ title: data.title, description: data.description || "", thumbnail: data.thumbnail || "" });
     setExpandedSections(new Set(data.modules.map((m: Module) => m.id)));
     setLoading(false);
+  }
+
+  async function fetchLinkedService() {
+    const res = await fetch("/api/services");
+    if (!res.ok) return;
+    const svcs = await res.json();
+    const linked = svcs.find((s: Record<string, unknown>) => {
+      const ids = String(s.course_id || "").split(",").map((c: string) => c.trim());
+      return ids.includes(courseId);
+    });
+    if (linked) setServiceSlug(String(linked.slug));
   }
 
   async function saveCourse() {
@@ -334,7 +348,13 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => router.push(`/checkout/${course.slug}`)}
+            onClick={() => {
+              if (serviceSlug) {
+                router.push(`/checkout/${serviceSlug}`);
+              } else {
+                toast.error("No service linked to this course");
+              }
+            }}
             className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
           >
             Preview Changes
