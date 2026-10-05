@@ -32,8 +32,10 @@ import {
   Upload,
   Paperclip,
   Loader2,
+  GripVertical,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import { RichTextEditor } from "@/components/rich-text-editor";
 
 interface Resource {
   name: string;
@@ -99,6 +101,10 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
   const [uploadingResource, setUploadingResource] = useState<string | null>(null);
   const resourceInputRef = useRef<HTMLInputElement>(null);
   const resourceTargetRef = useRef<{ moduleId: string; lessonId: string } | null>(null);
+
+  // Drag-and-drop reorder state
+  const dragItemRef = useRef<{ moduleId: string; lessonIdx: number } | null>(null);
+  const [dragOverTarget, setDragOverTarget] = useState<{ moduleId: string; lessonIdx: number } | null>(null);
 
   useEffect(() => { fetchCourse(); }, [courseId]);
 
@@ -248,6 +254,33 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
     resources.splice(index, 1);
     await updateChapter(moduleId, lessonId, { resources: JSON.stringify(resources) });
     toast.success("Resource removed");
+  }
+
+  async function reorderChapters(moduleId: string, fromIdx: number, toIdx: number) {
+    if (fromIdx === toIdx || !course) return;
+    const mod = course.modules.find((m) => m.id === moduleId);
+    if (!mod) return;
+
+    const lessons = [...mod.lessons];
+    const [moved] = lessons.splice(fromIdx, 1);
+    lessons.splice(toIdx, 0, moved);
+
+    setCourse({
+      ...course,
+      modules: course.modules.map((m) =>
+        m.id === moduleId ? { ...m, lessons } : m
+      ),
+    });
+
+    await Promise.all(
+      lessons.map((lesson, idx) =>
+        fetch(`/api/courses/${courseId}/modules/${moduleId}/lessons/${lesson.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ position: idx }),
+        })
+      )
+    );
   }
 
   function toggleSection(id: string) {
@@ -405,14 +438,47 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
                     {mod.lessons.map((lesson, lessonIdx) => {
                       const isExpanded = expandedChapters.has(lesson.id);
                       const isEditingDesc = editingDescription?.lessonId === lesson.id;
+                      const isDragOver = dragOverTarget?.moduleId === mod.id && dragOverTarget?.lessonIdx === lessonIdx;
                       return (
-                        <div key={lesson.id} className="mb-2">
+                        <div
+                          key={lesson.id}
+                          className={`mb-2 ${isDragOver ? "border-t-2 border-indigo-500" : ""}`}
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            if (dragItemRef.current?.moduleId === mod.id) {
+                              setDragOverTarget({ moduleId: mod.id, lessonIdx });
+                            }
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            if (dragItemRef.current?.moduleId === mod.id) {
+                              reorderChapters(mod.id, dragItemRef.current.lessonIdx, lessonIdx);
+                            }
+                            dragItemRef.current = null;
+                            setDragOverTarget(null);
+                          }}
+                        >
                           {/* Chapter header row */}
                           <div
                             className="flex items-center justify-between py-2.5 px-3 bg-white/80 border border-gray-200 rounded-lg cursor-pointer hover:bg-white transition-colors"
                             onClick={() => toggleChapter(lesson.id)}
                           >
                             <div className="flex items-center gap-2">
+                              <div
+                                draggable
+                                onDragStart={(e) => {
+                                  dragItemRef.current = { moduleId: mod.id, lessonIdx };
+                                  e.dataTransfer.effectAllowed = "move";
+                                }}
+                                onDragEnd={() => {
+                                  dragItemRef.current = null;
+                                  setDragOverTarget(null);
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                                className="cursor-grab active:cursor-grabbing p-0.5 -ml-1 text-gray-300 hover:text-gray-500"
+                              >
+                                <GripVertical className="h-4 w-4" />
+                              </div>
                               {isExpanded ? (
                                 <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
                               ) : (
@@ -554,7 +620,10 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
                                       <Pencil className="h-3.5 w-3.5" />
                                     </button>
                                   </div>
-                                  <p className="text-sm text-gray-600">{lesson.content}</p>
+                                  <div
+                                    className="text-sm text-gray-600 prose prose-sm max-w-none"
+                                    dangerouslySetInnerHTML={{ __html: lesson.content }}
+                                  />
                                 </div>
                               )}
 
@@ -562,13 +631,10 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
                               {isEditingDesc && editingDescription && (
                                 <div className="space-y-2">
                                   <h4 className="text-sm font-semibold text-gray-800">Chapter Description</h4>
-                                  <textarea
-                                    autoFocus
+                                  <RichTextEditor
                                     value={editingDescription.content}
-                                    onChange={(e) => setEditingDescription({ ...editingDescription, content: e.target.value })}
+                                    onChange={(val) => setEditingDescription({ ...editingDescription, content: val })}
                                     placeholder="Write a description for this chapter..."
-                                    rows={3}
-                                    className="w-full text-sm border border-gray-200 rounded-lg p-3 focus:outline-none focus:ring-1 focus:ring-indigo-400 resize-none"
                                   />
                                   <div className="flex justify-end gap-2">
                                     <button

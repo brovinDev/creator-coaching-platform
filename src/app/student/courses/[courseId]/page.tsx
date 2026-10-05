@@ -183,7 +183,7 @@ export default function StudentCoursePage({ params }: { params: Promise<{ course
                 {tab === "description" && (
                   <div className="prose prose-sm max-w-none text-gray-700">
                     {activeLesson.content ? (
-                      <p className="whitespace-pre-wrap">{activeLesson.content}</p>
+                      <div dangerouslySetInnerHTML={{ __html: activeLesson.content }} />
                     ) : (
                       <p className="text-gray-400">No description available.</p>
                     )}
