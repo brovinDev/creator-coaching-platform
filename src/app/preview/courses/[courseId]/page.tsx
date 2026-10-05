@@ -3,6 +3,7 @@
 import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
 import {
+  ArrowLeft,
   PlayCircle,
   FileText,
   CheckCircle,
@@ -13,7 +14,6 @@ import {
   ChevronLeft,
 } from "lucide-react";
 import { VideoPlayer } from "@/components/video-player";
-import toast from "react-hot-toast";
 
 interface Resource {
   name: string;
@@ -41,63 +41,37 @@ interface Course {
   title: string;
   description: string | null;
   creatorName: string;
+  creatorAvatar: string | null;
   modules: Module[];
 }
 
 type Tab = "description" | "resources" | "qna";
 
-export default function StudentCoursePage({ params }: { params: Promise<{ courseId: string }> }) {
+export default function PreviewCoursePage({ params }: { params: Promise<{ courseId: string }> }) {
   const { courseId } = use(params);
   const router = useRouter();
   const [course, setCourse] = useState<Course | null>(null);
-  const [completedLessons, setCompletedLessons] = useState<Set<string>>(new Set());
   const [activeLesson, setActiveLesson] = useState<Lesson | null>(null);
-  const [activeModule, setActiveModule] = useState<Module | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("description");
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  useEffect(() => { fetchCourse(); fetchProgress(); }, [courseId]);
+  useEffect(() => { fetchCourse(); }, [courseId]);
 
   async function fetchCourse() {
     const res = await fetch(`/api/student/courses/${courseId}`);
-    if (!res.ok) { router.push("/student"); return; }
+    if (!res.ok) { router.push("/creator/courses"); return; }
     const data = await res.json();
     setCourse(data);
     if (data.modules?.[0]?.lessons?.[0]) {
       setActiveLesson(data.modules[0].lessons[0]);
-      setActiveModule(data.modules[0]);
     }
     setLoading(false);
   }
 
-  async function fetchProgress() {
-    const res = await fetch(`/api/student/courses/${courseId}/progress`);
-    if (res.ok) {
-      const data = await res.json();
-      setCompletedLessons(new Set(data.map((p: { lessonId: string }) => p.lessonId)));
-    }
-  }
-
-  async function toggleCompletion(lessonId: string) {
-    const completed = !completedLessons.has(lessonId);
-    await fetch(`/api/student/courses/${courseId}/progress`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lessonId, completed }),
-    });
-    setCompletedLessons((prev) => {
-      const next = new Set(prev);
-      if (completed) next.add(lessonId); else next.delete(lessonId);
-      return next;
-    });
-    toast.success(completed ? "Lesson completed!" : "Marked as incomplete");
-  }
-
-  function selectLesson(lesson: Lesson, mod: Module) {
+  function selectLesson(lesson: Lesson) {
     setActiveLesson(lesson);
-    setActiveModule(mod);
     setTab("description");
   }
 
@@ -109,13 +83,8 @@ export default function StudentCoursePage({ params }: { params: Promise<{ course
     });
   }
 
-  function getLessonIcon(lesson: Lesson) {
-    if (lesson.videoUrl) return <PlayCircle className="h-4 w-4 text-gray-400 shrink-0" />;
-    return <FileText className="h-4 w-4 text-gray-400 shrink-0" />;
-  }
-
   function getLessonType(lesson: Lesson) {
-    if (lesson.videoUrl) return "Video";
+    if (lesson.videoUrl) return "Embedded Link";
     if (lesson.content) return "Text";
     return "Embedded Link";
   }
@@ -126,15 +95,39 @@ export default function StudentCoursePage({ params }: { params: Promise<{ course
   }
 
   if (loading || !course) {
-    return <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-400">Loading...</div>;
+    return <div className="min-h-screen flex items-center justify-center bg-white text-gray-400">Loading...</div>;
   }
 
+  const creatorInitials = course.creatorName
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
   return (
-    <div className="-m-6 lg:-m-8 min-h-screen bg-white flex flex-col">
+    <div className="min-h-screen bg-white flex flex-col">
+      {/* Slim top bar */}
+      <div className="flex items-center gap-3 px-4 py-2.5 border-b border-gray-200 bg-white shrink-0">
+        <button
+          onClick={() => router.back()}
+          className="p-1.5 rounded-full hover:bg-gray-100 transition-colors cursor-pointer"
+        >
+          <ArrowLeft className="h-5 w-5 text-gray-600" />
+        </button>
+        {course.creatorAvatar ? (
+          <img src={course.creatorAvatar} alt="" className="w-7 h-7 rounded-md object-cover" />
+        ) : (
+          <div className="w-7 h-7 rounded-md bg-indigo-600 flex items-center justify-center text-[10px] font-bold text-white">
+            {creatorInitials}
+          </div>
+        )}
+        <span className="text-sm font-medium text-gray-900 truncate">{course.title}</span>
+      </div>
+
       <div className="flex flex-1 min-h-0">
         {/* Main content area */}
         <div className="flex-1 min-w-0 flex flex-col overflow-y-auto">
-          {/* Video / Content area */}
           {activeLesson && (
             <>
               <div className="relative">
@@ -151,7 +144,6 @@ export default function StudentCoursePage({ params }: { params: Promise<{ course
                   </div>
                 )}
 
-                {/* Sidebar toggle arrow on the right edge of video */}
                 <button
                   onClick={() => setSidebarOpen(!sidebarOpen)}
                   className="absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-white/90 hover:bg-white shadow-md rounded-l-lg p-2 cursor-pointer transition-colors"
@@ -168,26 +160,13 @@ export default function StudentCoursePage({ params }: { params: Promise<{ course
               <div className="border-b border-gray-200">
                 <div className="flex items-center justify-between px-6 pt-5 pb-1">
                   <h2 className="text-lg font-semibold text-gray-900">{activeLesson.title}</h2>
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => toggleCompletion(activeLesson.id)}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
-                        completedLessons.has(activeLesson.id)
-                          ? "bg-green-50 text-green-700"
-                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                      }`}
-                    >
-                      <CheckCircle className="h-3.5 w-3.5" />
-                      {completedLessons.has(activeLesson.id) ? "Completed" : "Mark Complete"}
-                    </button>
-                  </div>
                 </div>
                 <div className="flex items-center px-6 mt-2">
                   {(["description", "resources", "qna"] as Tab[]).map((t) => (
                     <button
                       key={t}
                       onClick={() => setTab(t)}
-                      className={`px-5 py-2.5 text-sm font-medium capitalize transition-colors cursor-pointer border-b-2 ${
+                      className={`px-5 py-2.5 text-sm font-medium transition-colors cursor-pointer border-b-2 ${
                         tab === t
                           ? "border-gray-900 text-gray-900"
                           : "border-transparent text-gray-500 hover:text-gray-700"
@@ -253,7 +232,6 @@ export default function StudentCoursePage({ params }: { params: Promise<{ course
             <div className="flex-1 overflow-y-auto">
               {course.modules.map((mod) => {
                 const isCollapsed = collapsedSections.has(mod.id);
-                const completedInSection = mod.lessons.filter((l) => completedLessons.has(l.id)).length;
 
                 return (
                   <div key={mod.id} className="border-b border-gray-100">
@@ -264,7 +242,7 @@ export default function StudentCoursePage({ params }: { params: Promise<{ course
                       <div>
                         <h4 className="text-sm font-semibold text-gray-900 text-left">{mod.title}</h4>
                         <p className="text-xs text-gray-400 mt-0.5">
-                          {completedInSection} of {mod.lessons.length}
+                          0 of {mod.lessons.length}
                         </p>
                       </div>
                       {isCollapsed ? (
@@ -278,12 +256,11 @@ export default function StudentCoursePage({ params }: { params: Promise<{ course
                       <div className="pb-2">
                         {mod.lessons.map((lesson, idx) => {
                           const isActive = activeLesson?.id === lesson.id;
-                          const isCompleted = completedLessons.has(lesson.id);
                           const resCount = getResourceCount(lesson);
                           return (
                             <button
                               key={lesson.id}
-                              onClick={() => selectLesson(lesson, mod)}
+                              onClick={() => selectLesson(lesson)}
                               className={`w-full flex items-start gap-3 px-5 py-3 text-left transition-colors cursor-pointer ${
                                 isActive ? "bg-gray-100" : "hover:bg-gray-50"
                               }`}
@@ -301,10 +278,10 @@ export default function StudentCoursePage({ params }: { params: Promise<{ course
                                 </p>
                               </div>
                               <div className="shrink-0 mt-0.5">
-                                {isCompleted ? (
-                                  <CheckCircle className="h-4 w-4 text-green-500" />
+                                {lesson.videoUrl ? (
+                                  <PlayCircle className="h-4 w-4 text-gray-400" />
                                 ) : (
-                                  getLessonIcon(lesson)
+                                  <FileText className="h-4 w-4 text-gray-400" />
                                 )}
                               </div>
                             </button>

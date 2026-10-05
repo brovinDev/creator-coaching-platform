@@ -63,13 +63,6 @@ export default function CoursesPage() {
     }
   }
 
-  function findServiceForCourse(courseId: string): ServiceOption | undefined {
-    return services.find((s) => {
-      if (!s.course_id) return false;
-      return s.course_id.split(",").map((c) => c.trim()).includes(String(courseId));
-    });
-  }
-
   function openCreateModal() {
     setShowCreate(true);
     setNewTitle("");
@@ -257,15 +250,7 @@ export default function CoursesPage() {
                           <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(null)} />
                           <div className="absolute right-0 bottom-full mb-1 w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-20 py-2">
                             <button
-                              onClick={() => {
-                                setMenuOpen(null);
-                                const svc = findServiceForCourse(course.id);
-                                if (svc) {
-                                  router.push(`/checkout/${svc.slug}`);
-                                } else {
-                                  toast.error("No service linked to this course");
-                                }
-                              }}
+                              onClick={() => { setMenuOpen(null); router.push(`/preview/courses/${course.id}`); }}
                               className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
                             >
                               View as customer
