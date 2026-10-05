@@ -14,6 +14,7 @@ import {
   Settings,
   LogOut,
   MessageSquare,
+  Ticket,
   Menu,
   X,
 } from "lucide-react";
@@ -25,6 +26,7 @@ const navItems = [
   { label: "Courses", href: "/creator/courses", icon: BookOpen },
   { label: "Landing Pages", href: "/creator/landing-pages", icon: FileText },
   { label: "Community", href: "/creator/community", icon: MessageSquare },
+  { label: "Coupons", href: "/creator/coupons", icon: Ticket },
   { label: "Customers", href: "/creator/customers", icon: Users },
   { label: "Payments", href: "/creator/payments", icon: CreditCard },
   { label: "Settings", href: "/creator/settings", icon: Settings },

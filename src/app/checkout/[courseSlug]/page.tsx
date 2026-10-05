@@ -53,6 +53,10 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
 
   const [showCoupon, setShowCoupon] = useState(false);
   const [couponCode, setCouponCode] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<{
+    couponId: string; code: string; discount_type: string; discount_value: number;
+  } | null>(null);
+  const [applyingCoupon, setApplyingCoupon] = useState(false);
 
   useEffect(() => { fetchService(); }, [courseSlug]);
 
@@ -107,8 +111,14 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
   }
 
   const basePrice = service ? (service.discountedPrice ?? service.price) : 0;
-  const gstAmount = service?.enableGst ? Math.round(basePrice * 0.18) : 0;
-  const totalAmount = basePrice + gstAmount;
+  const couponDiscount = appliedCoupon
+    ? appliedCoupon.discount_type === "percentage"
+      ? Math.round(basePrice * appliedCoupon.discount_value / 100)
+      : Math.min(appliedCoupon.discount_value, basePrice)
+    : 0;
+  const priceAfterCoupon = Math.max(0, basePrice - couponDiscount);
+  const gstAmount = service?.enableGst ? Math.round(priceAfterCoupon * 0.18) : 0;
+  const totalAmount = priceAfterCoupon + gstAmount;
   const isFree = service?.serviceType === "free" || totalAmount === 0;
 
   async function handleSendOtp(e?: React.FormEvent) {
@@ -190,6 +200,35 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
     if (e.key === "Enter") handleVerifyOtp();
   }
 
+  async function handleApplyCoupon() {
+    if (!couponCode.trim()) return;
+    setApplyingCoupon(true);
+    try {
+      const res = await fetch("/api/coupons/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: couponCode, serviceId: service?.id }),
+      });
+      const data = await res.json();
+      if (res.ok && data.valid) {
+        setAppliedCoupon(data);
+        toast.success(`Coupon "${data.code}" applied!`);
+      } else {
+        toast.error(data.error || "Invalid coupon");
+      }
+    } catch {
+      toast.error("Failed to validate coupon");
+    } finally {
+      setApplyingCoupon(false);
+    }
+  }
+
+  function removeCoupon() {
+    setAppliedCoupon(null);
+    setCouponCode("");
+    setShowCoupon(false);
+  }
+
   async function handlePayment() {
     if (!service) return;
     if (authStep !== "done") { toast.error("Please sign in or create an account first"); return; }
@@ -198,7 +237,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
       if (isFree) {
         const res = await fetch("/api/checkout/free-enroll", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ courseId: service.courseId, serviceId: service.id }),
+          body: JSON.stringify({ courseId: service.courseId, serviceId: service.id, couponId: appliedCoupon?.couponId }),
         });
         if (res.ok) {
           const p = new URLSearchParams({ amount: "0", service: service.title, method: "Free" });
@@ -209,7 +248,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
       }
       const orderRes = await fetch("/api/checkout/create-order", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ courseId: service.courseId, serviceId: service.id, amount: totalAmount }),
+        body: JSON.stringify({ courseId: service.courseId, serviceId: service.id, amount: totalAmount, couponId: appliedCoupon?.couponId }),
       });
       const orderData = await orderRes.json();
       if (!orderRes.ok) { toast.error(orderData.error || "Failed to create order"); setSubmitting(false); return; }
@@ -386,7 +425,19 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
 
                 {/* Coupon */}
                 <div className="mt-5">
-                  {!showCoupon ? (
+                  {appliedCoupon ? (
+                    <div className="flex items-center justify-between px-4 py-3 bg-green-50 border border-green-200 rounded-xl">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                        <span className="text-sm font-medium text-green-700">
+                          {appliedCoupon.code} ({appliedCoupon.discount_type === "percentage" ? `${appliedCoupon.discount_value}% off` : `${formatPrice(appliedCoupon.discount_value)} off`})
+                        </span>
+                      </div>
+                      <button onClick={removeCoupon} className="text-gray-400 hover:text-red-500 cursor-pointer">
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : !showCoupon ? (
                     <button
                       onClick={() => setShowCoupon(true)}
                       className="w-full flex items-center justify-between px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-600 hover:border-gray-300 transition-colors cursor-pointer"
@@ -403,11 +454,13 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
                         <Input placeholder="Enter coupon code" value={couponCode} onChange={(e) => setCouponCode(e.target.value.toUpperCase())} />
                         {couponCode && (
                           <button onClick={() => { setCouponCode(""); setShowCoupon(false); }} className="absolute right-2 top-1/2 -translate-y-1/2 cursor-pointer">
-                            <X className="h-4 w-4 text-gray-400" />
+                            <X className="h-4 w-4" />
                           </button>
                         )}
                       </div>
-                      <Button variant="outline" onClick={() => toast.error("Coupon feature coming soon")}>Apply</Button>
+                      <Button variant="outline" onClick={handleApplyCoupon} disabled={applyingCoupon}>
+                        {applyingCoupon ? "..." : "Apply"}
+                      </Button>
                     </div>
                   )}
                 </div>
@@ -418,9 +471,16 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
                   <div className="flex items-start justify-between gap-4">
                     <span className="text-sm text-gray-900">{service.title}</span>
                     <span className="text-sm font-medium text-gray-900 shrink-0">
-                      {isFree ? "Free" : formatPrice(basePrice)}
+                      {isFree && !appliedCoupon ? "Free" : formatPrice(basePrice)}
                     </span>
                   </div>
+
+                  {appliedCoupon && couponDiscount > 0 && (
+                    <div className="flex items-center justify-between text-sm text-green-600">
+                      <span>Coupon ({appliedCoupon.code})</span>
+                      <span>-{formatPrice(couponDiscount)}</span>
+                    </div>
+                  )}
 
                   {service.enableGst && gstAmount > 0 && (
                     <div className="flex items-center justify-between text-sm text-gray-500">

@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     }
 
     const token = await getNocodeToken();
-    const { courseId, serviceId, amount } = await req.json();
+    const { courseId, serviceId, amount, couponId } = await req.json();
 
     if (!courseId) {
       return NextResponse.json({ error: "Course ID is required" }, { status: 400 });
@@ -75,9 +75,17 @@ export async function POST(req: NextRequest) {
         currency: "INR",
         status: "pending",
         razorpay_order_id: razorpayOrder.id,
+        coupon_id: couponId || null,
       },
       token
     );
+
+    if (couponId) {
+      const coupon = await nocodeDb.coupons.findUnique({ id: couponId }, token);
+      if (coupon) {
+        await nocodeDb.coupons.update(couponId, { usage_count: Number(coupon.usage_count || 0) + 1 }, token);
+      }
+    }
 
     return NextResponse.json({
       razorpayOrderId: razorpayOrder.id,

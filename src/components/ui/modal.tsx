@@ -45,7 +45,7 @@ export function Modal({ open, onClose, title, children, className }: ModalProps)
             </button>
           </div>
         )}
-        <div className="px-6 pb-6 pt-2 max-h-[80vh] overflow-y-auto">{children}</div>
+        <div className="px-6 pb-6 pt-2 max-h-[80vh] overflow-y-auto overflow-x-hidden scrollbar-thin">{children}</div>
       </div>
     </div>
   );

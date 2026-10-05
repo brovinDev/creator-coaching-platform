@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
     }
 
     const token = await getNocodeToken();
-    const { courseId, serviceId } = await req.json();
+    const { courseId, serviceId, couponId } = await req.json();
 
     if (!courseId && !serviceId) {
       return NextResponse.json({ error: "Course ID or Service ID is required" }, { status: 400 });
@@ -54,6 +54,13 @@ export async function POST(req: NextRequest) {
     } else if (courseId) {
       const course = await nocodeDb.courses.findUnique({ id: courseId }, token);
       if (course) enrollmentName = String(course.title || "Course");
+    }
+
+    if (couponId) {
+      const coupon = await nocodeDb.coupons.findUnique({ id: couponId }, token);
+      if (coupon) {
+        await nocodeDb.coupons.update(couponId, { usage_count: Number(coupon.usage_count || 0) + 1 }, token);
+      }
     }
 
     if (session.user.email) {

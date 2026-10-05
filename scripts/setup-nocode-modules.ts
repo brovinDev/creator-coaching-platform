@@ -156,6 +156,22 @@ const modules = [
     ],
   },
   {
+    table_name: "coupons",
+    module_label: "Coupons",
+    fields: [
+      { name: "code", label: "Code", type: "text", required: true },
+      { name: "service_id", label: "Service ID", type: "text" },
+      { name: "discount_type", label: "Discount Type", type: "text", required: true },
+      { name: "discount_value", label: "Discount Value", type: "number", required: true },
+      { name: "max_usages", label: "Max Usages", type: "number" },
+      { name: "usage_count", label: "Usage Count", type: "number" },
+      { name: "start_date", label: "Start Date", type: "text", required: true },
+      { name: "end_date", label: "End Date", type: "text", required: true },
+      { name: "status", label: "Status", type: "text", required: true },
+      { name: "creator_id", label: "Creator ID", type: "text", required: true },
+    ],
+  },
+  {
     table_name: "email_otps",
     module_label: "Email OTPs",
     fields: [

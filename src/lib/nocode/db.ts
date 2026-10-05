@@ -25,6 +25,7 @@ export const MODULES = {
   email_otps: "email_otps",
   user_profiles: "user_profiles",
   services: "services",
+  coupons: "coupons",
 } as const;
 
 type Row = Record<string, unknown>;
@@ -139,4 +140,5 @@ export const nocodeDb = {
   emailOtps: new NocodeModel(MODULES.email_otps),
   userProfiles: new NocodeModel(MODULES.user_profiles),
   services: new NocodeModel(MODULES.services),
+  coupons: new NocodeModel(MODULES.coupons),
 };
