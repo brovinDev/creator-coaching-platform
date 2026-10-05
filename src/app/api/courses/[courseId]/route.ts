@@ -80,7 +80,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ co
     const updateFields: Record<string, unknown> = {};
     if (data.title !== undefined) updateFields.title = data.title;
     if (data.description !== undefined) updateFields.description = data.description;
-    if (data.price !== undefined) updateFields.price = data.price;
     if (data.thumbnail !== undefined) updateFields.thumbnail = data.thumbnail;
     if (data.published !== undefined) updateFields.published = data.published;
 
@@ -90,7 +89,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ co
       id: courseId,
       title: data.title ?? course.title,
       description: data.description ?? course.description,
-      price: data.price ?? course.price,
       slug: course.slug,
       published: data.published ?? course.published,
       thumbnail: data.thumbnail ?? course.thumbnail,

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth, getNocodeToken } from "@/lib/auth";
 import { nocodeDb } from "@/lib/nocode/db";
+import { hasEnrollmentAccess } from "@/lib/enrollment";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ courseId: string }> }) {
   const { courseId } = await params;
@@ -9,11 +10,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ cour
 
   const token = await getNocodeToken();
 
-  const enrollment = await nocodeDb.enrollments.findUnique(
-    { user_id: session.user.id, course_id: courseId },
-    token
-  );
-  if (!enrollment) {
+  const hasAccess = await hasEnrollmentAccess(session.user.id, courseId, token);
+  if (!hasAccess) {
     return NextResponse.json({ error: "Not enrolled" }, { status: 403 });
   }
 

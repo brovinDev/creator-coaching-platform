@@ -48,10 +48,19 @@ export async function POST(req: NextRequest) {
       SYSTEM_TOKEN
     );
 
-    await nocodeDb.enrollments.create(
-      { user_id: String(order.user_id), course_id: String(order.course_id) },
-      SYSTEM_TOKEN
-    );
+    const serviceId = order.service_id ? String(order.service_id) : null;
+
+    if (serviceId) {
+      await nocodeDb.enrollments.create(
+        { user_id: String(order.user_id), service_id: serviceId },
+        SYSTEM_TOKEN
+      );
+    } else {
+      await nocodeDb.enrollments.create(
+        { user_id: String(order.user_id), course_id: String(order.course_id) },
+        SYSTEM_TOKEN
+      );
+    }
 
     const course = await nocodeDb.courses.findUnique({ id: String(order.course_id) }, SYSTEM_TOKEN);
     const userProfile = await nocodeDb.userProfiles.findUnique({ user_id: String(order.user_id) }, SYSTEM_TOKEN);
@@ -89,6 +98,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       message: "Payment verified and enrollment created",
       courseSlug,
+      transactionId: razorpayPaymentId,
+      amount,
+      serviceName: courseTitle,
+      paymentMethod: "Razorpay",
     });
   } catch (error) {
     console.error("Verify payment error:", error);

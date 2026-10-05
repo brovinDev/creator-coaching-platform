@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { nocodeDb } from "@/lib/nocode/db";
-import { nocodeSignup } from "@/lib/nocode/client";
+import { nocodeSignup, nocodeActivateUser, nocodeSignin } from "@/lib/nocode/client";
 import { sendEmail } from "@/lib/email";
 
 const SYSTEM_TOKEN = process.env.NOCODE_SYSTEM_TOKEN || "";
@@ -18,12 +18,12 @@ export async function POST(req: NextRequest) {
     }
 
     const records = await nocodeDb.emailOtps.findMany(
-      { where: { email, otp, verified: false } },
+      { where: { email, otp } },
       SYSTEM_TOKEN
     );
 
     const record = records.find(
-      (r) => new Date(r.expires_at as string) > new Date()
+      (r) => !r.verified && new Date(r.expires_at as string) > new Date()
     );
 
     if (!record) {
@@ -38,30 +38,42 @@ export async function POST(req: NextRequest) {
 
     const nameParts = name.trim().split(/\s+/);
     const firstName = nameParts[0] || name;
-    const lastName = nameParts.slice(1).join(" ") || "";
+    const lastName = nameParts.slice(1).join(" ") || ".";
 
     try {
-      const signupRes = await nocodeSignup({
+      await nocodeSignup({
         email,
         password,
         first_name: firstName,
         last_name: lastName,
       });
+    } catch (err) {
+      const msg = (err as Error).message || "";
+      if (!msg.includes("already") && !msg.includes("exists")) {
+        console.error("Signup error:", msg);
+        return NextResponse.json({ error: msg || "Signup failed" }, { status: 400 });
+      }
+    }
 
-      if ((signupRes as { success: boolean }).success) {
-        const userData = (signupRes as { data?: { id?: string } }).data;
-        if (userData?.id) {
+    await nocodeActivateUser(email, SYSTEM_TOKEN).catch((e) => {
+      console.error("Activate user error:", e);
+    });
+
+    try {
+      const signinRes = await nocodeSignin(email, password);
+      if (signinRes.success && signinRes.data?.id) {
+        const existing = await nocodeDb.userProfiles
+          .findUnique({ user_id: signinRes.data.id }, SYSTEM_TOKEN)
+          .catch(() => null);
+        if (!existing) {
           await nocodeDb.userProfiles.create(
-            { user_id: userData.id, role: "STUDENT" },
+            { user_id: signinRes.data.id, role: "STUDENT" },
             SYSTEM_TOKEN
           );
         }
       }
-    } catch (err) {
-      const msg = (err as Error).message || "";
-      if (!msg.includes("already") && !msg.includes("exists")) {
-        throw err;
-      }
+    } catch {
+      // Profile creation is non-critical
     }
 
     await nocodeDb.emailOtps.deleteWhere({ email }, SYSTEM_TOKEN);

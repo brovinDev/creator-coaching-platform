@@ -18,6 +18,8 @@ export async function GET(
   }
 
   let activeUsers = 0;
+  const serviceEnrollCount = await nocodeDb.enrollments.count({ service_id: serviceId }, token);
+  activeUsers += serviceEnrollCount;
   const courseIdsStr = (service.course_id as string) || "";
   const courseIds = courseIdsStr ? courseIdsStr.split(",").filter(Boolean) : [];
   for (const cid of courseIds) {
@@ -52,6 +54,7 @@ export async function PUT(
     "title", "description", "cover_image", "service_type", "status",
     "currency", "price", "discounted_price", "start_date", "enable_gst",
     "payment_success_message", "published", "course_id",
+    "payment_config", "success_config",
   ];
 
   const updates: Record<string, unknown> = {};
@@ -59,8 +62,14 @@ export async function PUT(
     if (field in body) updates[field] = body[field];
   }
 
-  const updated = await nocodeDb.services.update(serviceId, updates, token);
-  return NextResponse.json(updated);
+  try {
+    const updated = await nocodeDb.services.update(serviceId, updates, token);
+    return NextResponse.json(updated);
+  } catch (error) {
+    console.error("[SERVICE PUT ERROR]", error);
+    const msg = error instanceof Error ? error.message : "Failed to update service";
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
 }
 
 export async function DELETE(

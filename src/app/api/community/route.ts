@@ -38,9 +38,19 @@ export async function GET() {
 
   if (enrollments.length === 0) return NextResponse.json([]);
 
-  const courseIds = enrollments.map((e) => String(e.course_id));
+  const courseIdSet = new Set<string>();
+  for (const e of enrollments) {
+    if (e.course_id) courseIdSet.add(String(e.course_id));
+    if (e.service_id) {
+      const svc = await nocodeDb.services.findUnique({ id: String(e.service_id) }, token);
+      if (svc?.course_id) {
+        String(svc.course_id).split(",").filter(Boolean).forEach((cid) => courseIdSet.add(cid.trim()));
+      }
+    }
+  }
+
   const courses = await Promise.all(
-    courseIds.map((cid) => nocodeDb.courses.findUnique({ id: cid }, token))
+    Array.from(courseIdSet).map((cid) => nocodeDb.courses.findUnique({ id: cid }, token))
   );
 
   const creatorIds = [...new Set(courses.filter(Boolean).map((c) => String(c!.creator_id)))];

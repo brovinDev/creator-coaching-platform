@@ -16,6 +16,7 @@ export async function GET() {
   const enriched = await Promise.all(
     services.map(async (s) => {
       let activeUsers = 0;
+      activeUsers += await nocodeDb.enrollments.count({ service_id: String(s.id) }, token);
       const courseIdsStr = (s.course_id as string) || "";
       const courseIdsList = courseIdsStr ? courseIdsStr.split(",").filter(Boolean) : [];
       for (const cid of courseIdsList) {
@@ -81,6 +82,8 @@ export async function POST(req: NextRequest) {
       course_id: body.course_id || null,
       enable_gst: body.enable_gst || false,
       payment_success_message: body.payment_success_message || "",
+      payment_config: body.payment_config || null,
+      success_config: body.success_config || null,
       published: false,
     },
     token

@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-    await nocodeDb.emailOtps.deleteWhere({ email, verified: false }, SYSTEM_TOKEN);
+    await nocodeDb.emailOtps.deleteWhere({ email }, SYSTEM_TOKEN).catch(() => {});
 
     await nocodeDb.emailOtps.create(
       {

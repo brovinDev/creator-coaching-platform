@@ -11,9 +11,20 @@ export default async function StudentDashboard() {
 
   const enrollments = await nocodeDb.enrollments.findMany({ where: { user_id: userId } }, token);
 
-  const courseIds = enrollments.map((e) => String(e.course_id));
+  const courseIdSet = new Set<string>();
+
+  for (const e of enrollments) {
+    if (e.course_id) courseIdSet.add(String(e.course_id));
+    if (e.service_id) {
+      const svc = await nocodeDb.services.findUnique({ id: String(e.service_id) }, token);
+      if (svc?.course_id) {
+        String(svc.course_id).split(",").filter(Boolean).forEach((cid) => courseIdSet.add(cid.trim()));
+      }
+    }
+  }
+
   const courses = [];
-  for (const courseId of courseIds) {
+  for (const courseId of courseIdSet) {
     const course = await nocodeDb.courses.findUnique({ id: courseId }, token);
     if (course) courses.push(course);
   }

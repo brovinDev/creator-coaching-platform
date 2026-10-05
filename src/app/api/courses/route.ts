@@ -13,21 +13,34 @@ export async function GET() {
     token
   );
 
+  const profile = await nocodeDb.userProfiles
+    .findUnique({ user_id: session.user.id }, token)
+    .catch(() => null);
+  const creatorName = profile
+    ? `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || "Creator"
+    : "Creator";
+
   const enriched = await Promise.all(
     courses.map(async (c) => {
-      const enrollmentCount = await nocodeDb.enrollments.count({ course_id: String(c.id) }, token);
-      const moduleCount = await nocodeDb.courseModules.count({ course_id: String(c.id) }, token);
+      const modules = await nocodeDb.courseModules.findMany(
+        { where: { course_id: String(c.id) } },
+        token
+      );
+      let lessonCount = 0;
+      for (const m of modules) {
+        lessonCount += await nocodeDb.lessons.count({ module_id: String(m.id) }, token);
+      }
       return {
         id: c.id,
         title: c.title,
         description: c.description,
-        price: c.price,
         slug: c.slug,
         published: c.published,
         thumbnail: c.thumbnail,
         creatorId: c.creator_id,
+        creatorName,
         createdAt: c.created_at,
-        _count: { enrollments: enrollmentCount, modules: moduleCount },
+        _count: { sections: modules.length, lectures: lessonCount },
       };
     })
   );
@@ -41,7 +54,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { title, description, price, thumbnail } = await req.json();
+  const { title, description, thumbnail } = await req.json();
   if (!title) return NextResponse.json({ error: "Title is required" }, { status: 400 });
 
   const token = await getNocodeToken();
@@ -55,7 +68,7 @@ export async function POST(req: NextRequest) {
       title,
       slug,
       description: description || "",
-      price: price || 0,
+      price: 0,
       thumbnail: thumbnail || null,
       published: false,
       creator_id: session.user.id,
