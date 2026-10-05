@@ -21,6 +21,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (data.content !== undefined) updateFields.content = data.content;
   if (data.videoUrl !== undefined) updateFields.video_url = data.videoUrl;
   if (data.thumbnail !== undefined) updateFields.thumbnail = data.thumbnail;
+  if (data.resources !== undefined) updateFields.resources = data.resources;
 
   const updated = await nocodeDb.lessons.update(lessonId, updateFields, token);
 
@@ -32,6 +33,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     thumbnail: updated.thumbnail,
     position: updated.position,
     moduleId: updated.module_id,
+    resources: updated.resources,
   });
 }
 

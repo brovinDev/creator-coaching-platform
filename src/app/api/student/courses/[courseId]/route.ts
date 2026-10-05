@@ -38,6 +38,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ cour
           content: l.content,
           videoUrl: l.video_url,
           thumbnail: l.thumbnail,
+          resources: l.resources || null,
         })),
       };
     })

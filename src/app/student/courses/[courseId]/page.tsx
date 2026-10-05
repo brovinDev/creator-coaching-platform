@@ -3,16 +3,21 @@
 import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft,
   PlayCircle,
   FileText,
   CheckCircle,
   ChevronUp,
   ChevronDown,
-  LinkIcon,
+  Download,
 } from "lucide-react";
 import { VideoPlayer } from "@/components/video-player";
 import toast from "react-hot-toast";
+
+interface Resource {
+  name: string;
+  url: string;
+  type: string;
+}
 
 interface Lesson {
   id: string;
@@ -20,6 +25,7 @@ interface Lesson {
   content: string | null;
   videoUrl: string | null;
   thumbnail: string | null;
+  resources: string | null;
 }
 
 interface Module {
@@ -183,9 +189,31 @@ export default function StudentCoursePage({ params }: { params: Promise<{ course
                     )}
                   </div>
                 )}
-                {tab === "resources" && (
-                  <p className="text-sm text-gray-400">No resources attached to this chapter.</p>
-                )}
+                {tab === "resources" && (() => {
+                  let resources: Resource[] = [];
+                  try { resources = activeLesson.resources ? JSON.parse(activeLesson.resources) : []; } catch { /* ignore */ }
+                  return resources.length > 0 ? (
+                    <div className="space-y-2">
+                      {resources.map((res, i) => (
+                        <a
+                          key={i}
+                          href={res.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                        >
+                          <div className="w-9 h-9 rounded bg-red-50 flex items-center justify-center shrink-0">
+                            <span className="text-[10px] font-bold text-red-600">{res.type}</span>
+                          </div>
+                          <span className="text-sm text-gray-700 flex-1 truncate">{res.name}</span>
+                          <Download className="h-4 w-4 text-gray-400" />
+                        </a>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-400">No resources attached to this chapter.</p>
+                  );
+                })()}
                 {tab === "qna" && (
                   <p className="text-sm text-gray-400">QnA coming soon.</p>
                 )}

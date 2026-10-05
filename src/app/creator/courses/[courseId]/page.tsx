@@ -30,8 +30,16 @@ import {
   X,
   Video,
   Upload,
+  Paperclip,
+  Loader2,
 } from "lucide-react";
 import toast from "react-hot-toast";
+
+interface Resource {
+  name: string;
+  url: string;
+  type: string;
+}
 
 interface Lesson {
   id: string;
@@ -40,6 +48,7 @@ interface Lesson {
   videoUrl: string | null;
   thumbnail: string | null;
   position: number;
+  resources: string | null;
 }
 
 interface Module {
@@ -85,6 +94,11 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
   // Upload/edit state
   const [showVideoModal, setShowVideoModal] = useState<{ moduleId: string; lessonId: string } | null>(null);
   const [editingDescription, setEditingDescription] = useState<{ moduleId: string; lessonId: string; content: string } | null>(null);
+
+  // Resource upload state
+  const [uploadingResource, setUploadingResource] = useState<string | null>(null);
+  const resourceInputRef = useRef<HTMLInputElement>(null);
+  const resourceTargetRef = useRef<{ moduleId: string; lessonId: string } | null>(null);
 
   useEffect(() => { fetchCourse(); }, [courseId]);
 
@@ -186,6 +200,54 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
     await updateChapter(editingDescription.moduleId, editingDescription.lessonId, { content: editingDescription.content });
     toast.success("Description saved");
     setEditingDescription(null);
+  }
+
+  function parseResources(lesson: Lesson): Resource[] {
+    if (!lesson.resources) return [];
+    try { return JSON.parse(lesson.resources); } catch { return []; }
+  }
+
+  async function handleResourceUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !resourceTargetRef.current) return;
+    const { moduleId, lessonId } = resourceTargetRef.current;
+
+    if (file.size > 25 * 1024 * 1024) {
+      toast.error("File too large. Max 25MB.");
+      return;
+    }
+
+    setUploadingResource(lessonId);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("type", "image");
+      const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
+      if (!uploadRes.ok) throw new Error("Upload failed");
+      const { url } = await uploadRes.json();
+
+      const ext = file.name.split(".").pop()?.toUpperCase() || "FILE";
+      const lesson = course?.modules.find((m) => m.id === moduleId)?.lessons.find((l) => l.id === lessonId);
+      const existing = lesson ? parseResources(lesson) : [];
+      existing.push({ name: file.name, url, type: ext });
+
+      await updateChapter(moduleId, lessonId, { resources: JSON.stringify(existing) });
+      toast.success("Resource uploaded");
+    } catch {
+      toast.error("Failed to upload resource");
+    } finally {
+      setUploadingResource(null);
+      if (resourceInputRef.current) resourceInputRef.current.value = "";
+    }
+  }
+
+  async function deleteResource(moduleId: string, lessonId: string, index: number) {
+    const lesson = course?.modules.find((m) => m.id === moduleId)?.lessons.find((l) => l.id === lessonId);
+    if (!lesson) return;
+    const resources = parseResources(lesson);
+    resources.splice(index, 1);
+    await updateChapter(moduleId, lessonId, { resources: JSON.stringify(resources) });
+    toast.success("Resource removed");
   }
 
   function toggleSection(id: string) {
@@ -525,6 +587,34 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
                                 </div>
                               )}
 
+                              {/* Chapter Resources */}
+                              {(() => {
+                                const resources = parseResources(lesson);
+                                return resources.length > 0 ? (
+                                  <div className="space-y-1">
+                                    <h4 className="text-sm font-semibold text-gray-800">Chapter Resources</h4>
+                                    <div className="space-y-1.5">
+                                      {resources.map((res, ri) => (
+                                        <div key={ri} className="flex items-center gap-2 p-2 bg-white rounded-lg border border-gray-100">
+                                          <div className="w-8 h-8 rounded bg-red-50 flex items-center justify-center shrink-0">
+                                            <span className="text-[10px] font-bold text-red-600">{res.type}</span>
+                                          </div>
+                                          <div className="flex-1 min-w-0">
+                                            <p className="text-sm text-gray-700 truncate">{res.name}</p>
+                                          </div>
+                                          <button
+                                            onClick={() => deleteResource(mod.id, lesson.id, ri)}
+                                            className="p-1 text-gray-300 hover:text-red-500 cursor-pointer"
+                                          >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                          </button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ) : null;
+                              })()}
+
                               {/* Action buttons when no content yet or adding more */}
                               {!isEditingDesc && (
                                 <div className="flex items-center gap-3">
@@ -544,6 +634,19 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
                                       + Content
                                     </button>
                                   )}
+                                  <button
+                                    onClick={() => {
+                                      resourceTargetRef.current = { moduleId: mod.id, lessonId: lesson.id };
+                                      resourceInputRef.current?.click();
+                                    }}
+                                    className="text-xs text-gray-500 hover:text-gray-700 cursor-pointer flex items-center gap-1"
+                                  >
+                                    {uploadingResource === lesson.id ? (
+                                      <><Loader2 className="h-3 w-3 animate-spin" /> Uploading...</>
+                                    ) : (
+                                      <>+ Resources</>
+                                    )}
+                                  </button>
                                 </div>
                               )}
                             </div>
@@ -649,6 +752,15 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
           />
         )}
       </Modal>
+
+      {/* Hidden file input for resource uploads */}
+      <input
+        ref={resourceInputRef}
+        type="file"
+        className="hidden"
+        accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.txt,.csv,.png,.jpg,.jpeg,.gif,.mp3,.mp4"
+        onChange={handleResourceUpload}
+      />
     </div>
   );
 }

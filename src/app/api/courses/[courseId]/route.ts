@@ -11,6 +11,7 @@ function mapLesson(l: Record<string, unknown>) {
     thumbnail: l.thumbnail,
     position: l.position,
     moduleId: l.module_id,
+    resources: l.resources || null,
   };
 }
 
