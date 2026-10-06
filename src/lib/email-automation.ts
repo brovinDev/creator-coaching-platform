@@ -27,3 +27,27 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export function isValidEmail(value: string) {
   return value.length <= 254 && EMAIL_PATTERN.test(value);
 }
+
+/** Template columns from a request body. `prefix` is "" for a service row, "default_" on the creator settings row. */
+export function templateFieldsFromBody(body: Record<string, unknown>, prefix: "" | "default_") {
+  const data: Record<string, unknown> = {};
+  if (typeof body.subject === "string") data[`${prefix}subject`] = body.subject.slice(0, 200);
+  if (typeof body.body_text === "string") data[`${prefix}body_text`] = body.body_text.slice(0, 20000);
+  if (typeof body.design_json === "string") data[`${prefix}design_json`] = body.design_json;
+  if (typeof body.html === "string") data[`${prefix}html`] = body.html;
+  if (body.format === "text" || body.format === "html") data[`${prefix}format`] = body.format;
+  return data;
+}
+
+/** What an editor needs to show a stored template. */
+export function templateForEditor(row: Record<string, unknown> | null | undefined, prefix: "" | "default_") {
+  const html = String(row?.[`${prefix}html`] || "");
+  const stored = row?.[`${prefix}format`];
+  return {
+    subject: String(row?.[`${prefix}subject`] || ""),
+    // Designs saved before the simple editor existed have no format; they are HTML.
+    format: stored === "text" || stored === "html" ? stored : html ? "html" : "text",
+    body_text: String(row?.[`${prefix}body_text`] || ""),
+    design_json: (row?.[`${prefix}design_json`] as string) || null,
+  };
+}

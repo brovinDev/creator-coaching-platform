@@ -14,12 +14,14 @@ interface SendEmailOptions {
   to: string;
   subject: string;
   html: string;
+  /** Plain-text alternative sent alongside the HTML. */
+  text?: string;
   /** Display name shown to the recipient; the sending address stays the platform's. */
   fromName?: string;
   replyTo?: string;
 }
 
-export async function sendEmail({ to, subject, html, fromName, replyTo }: SendEmailOptions) {
+export async function sendEmail({ to, subject, html, text, fromName, replyTo }: SendEmailOptions) {
   const address = process.env.EMAIL_FROM || process.env.SMTP_USER;
   // Strip anything that could break out of the quoted display name or inject a header.
   const safeName = fromName?.replace(/[\r\n"<>]/g, "").trim();
@@ -28,6 +30,7 @@ export async function sendEmail({ to, subject, html, fromName, replyTo }: SendEm
     to,
     subject,
     html,
+    ...(text ? { text } : {}),
     ...(replyTo ? { replyTo } : {}),
   });
 }

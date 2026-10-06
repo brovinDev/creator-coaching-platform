@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getNocodeToken } from "@/lib/auth";
 import { nocodeDb } from "@/lib/nocode/db";
-import { getOwnedService } from "@/lib/email-automation";
+import { getOwnedService, templateFieldsFromBody, templateForEditor } from "@/lib/email-automation";
+import { contentFromRow } from "@/lib/email-template-render";
 
 type Ctx = { params: Promise<{ serviceId: string }> };
 
@@ -15,9 +16,8 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
   return NextResponse.json({
     service_title: String(owned.service.title || ""),
     exists: !!row,
-    subject: row?.subject || "",
-    design_json: row?.design_json || null,
     enabled: !!row?.enabled,
+    ...templateForEditor(row, ""),
   });
 }
 
@@ -28,25 +28,17 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
   if ("error" in owned) return NextResponse.json({ error: owned.error }, { status: owned.status });
 
   const body = await req.json();
-  const data: Record<string, unknown> = {};
-  if (typeof body.subject === "string") data.subject = body.subject.slice(0, 200);
+  const data = templateFieldsFromBody(body, "");
   if (typeof body.enabled === "boolean") data.enabled = body.enabled;
-  if (typeof body.design_json === "string") data.design_json = body.design_json;
-  if (typeof body.html === "string") data.html = body.html;
-
-  if (data.enabled === true) {
-    const existing = await nocodeDb.serviceEmailTemplates.findUnique({ service_id: serviceId }, token);
-    const hasHtml = (typeof data.html === "string" && data.html) || existing?.html;
-    if (!hasHtml || !(data.subject || existing?.subject)) {
-      return NextResponse.json(
-        { error: "Design the email and add a subject before enabling it" },
-        { status: 400 }
-      );
-    }
-  }
 
   try {
     const existing = await nocodeDb.serviceEmailTemplates.findUnique({ service_id: serviceId }, token);
+
+    // Turning an email on needs something to send, whichever editor made it.
+    if (data.enabled === true && !contentFromRow({ ...existing, ...data }, "")) {
+      return NextResponse.json({ error: "Write the email and add a subject before enabling it" }, { status: 400 });
+    }
+
     if (existing) {
       await nocodeDb.serviceEmailTemplates.update(String(existing.id), data, token);
     } else {
@@ -59,7 +51,7 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
   }
 }
 
-/** Reset: drop the custom design so the service goes back to the default email. */
+/** Reset: drop the custom email so the service goes back to the default. */
 export async function DELETE(_req: NextRequest, { params }: Ctx) {
   const { serviceId } = await params;
   const token = await getNocodeToken();

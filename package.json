@@ -24,6 +24,7 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
     "dotenv": "^18.0.5",
+    "html-to-text": "^10.0.1",
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^1.49.0",
     "next": "16.3.8",
@@ -45,6 +46,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/bcryptjs": "^2.4.6",
+    "@types/html-to-text": "^9.0.4",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20",
     "@types/nodemailer": "^8.0.2",

@@ -3,10 +3,10 @@
 import { use } from "react";
 import dynamic from "next/dynamic";
 
-// The Beefree SDK touches `window`, so it can only render in the browser.
-const EmailTemplateEditor = dynamic(() => import("@/components/creator/email-template-editor"), { ssr: false });
+// The email builder touches `window`, so the editor can only render in the browser.
+const EmailEditor = dynamic(() => import("@/components/creator/email-editor"), { ssr: false });
 
 export default function EditServiceEmailPage({ params }: { params: Promise<{ serviceId: string }> }) {
   const { serviceId } = use(params);
-  return <EmailTemplateEditor serviceId={serviceId} />;
+  return <EmailEditor serviceId={serviceId} />;
 }

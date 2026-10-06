@@ -5,7 +5,12 @@ import {
   serviceRegistrationEmail,
   serviceSaleNotificationEmail,
 } from "@/lib/email";
-import { renderMergeTags } from "@/lib/email-merge-tags";
+import {
+  buildPlaceholderValues,
+  contentFromRow,
+  renderEmailTemplate,
+  type EmailTemplateContent,
+} from "@/lib/email-template-render";
 
 const SYSTEM_TOKEN = process.env.NOCODE_SYSTEM_TOKEN || "";
 
@@ -96,33 +101,28 @@ export async function sendRegistrationEmails(
     if (learnerEmail && !confirmationOn) {
       console.log(`[registration-emails] Confirmation email switched off by creator ${creatorId}; skipping learner email`);
     } else if (learnerEmail) {
-      let content: { subject: string; html: string } | null = null;
+      let content: { subject: string; html: string; text?: string } | null = null;
 
-      // Order: this service's own design, then the creator's default design, then the built-in email.
+      // Order: this service's own email, then the creator's default, then the built-in email.
       const paid = (input.amount ?? 0) > 0;
-      const values = {
-        name: learnerName || "there",
-        email: learnerEmail,
-        creator_name: profileName(creator),
-        service_name: name,
+      const values = buildPlaceholderValues({
+        learnerName,
+        learnerEmail,
+        creatorName: profileName(creator),
+        serviceName: name,
         amount: paid ? formatAmount(input.amount!, currency) : "Free",
-        transaction_id: input.transactionId || "",
-        dashboard_url: `${process.env.NEXT_PUBLIC_APP_URL}/student`,
-      };
-      const render = (subject: unknown, html: unknown) => ({
-        subject: renderMergeTags(String(subject), values),
-        html: renderMergeTags(String(html), values),
+        transactionId: input.transactionId || "",
       });
 
+      let template: EmailTemplateContent | null = null;
       if (input.serviceId) {
         const custom = await nocodeDb.serviceEmailTemplates
           .findUnique({ service_id: input.serviceId }, SYSTEM_TOKEN)
           .catch(() => null);
-        if (custom?.enabled && custom.html && custom.subject) content = render(custom.subject, custom.html);
+        if (custom?.enabled) template = contentFromRow(custom, "");
       }
-      if (!content && settings?.default_html && settings?.default_subject) {
-        content = render(settings.default_subject, settings.default_html);
-      }
+      template ??= contentFromRow(settings, "default_");
+      if (template) content = renderEmailTemplate(template, values);
 
       content ??= serviceRegistrationEmail({
         name: learnerName,

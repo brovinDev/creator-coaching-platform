@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getNocodeToken } from "@/lib/auth";
 import { nocodeDb } from "@/lib/nocode/db";
 import { requireCreator } from "@/lib/email-automation";
+import { contentFromRow } from "@/lib/email-template-render";
 
 /** Every service of the signed-in creator, with the state of its custom confirmation email. */
 export async function GET() {
@@ -15,7 +16,7 @@ export async function GET() {
   );
   // A service with no design of its own sends the creator's default, so that is importable too.
   const settings = await nocodeDb.creatorEmailSettings.findUnique({ creator_id: creator.user.id }, token);
-  const hasDefault = !!(settings?.default_html && settings?.default_subject);
+  const hasDefault = !!contentFromRow(settings, "default_");
   if (services.length === 0) return NextResponse.json({ services: [], has_default: hasDefault });
 
   // No joins in nocode, and the HTML bodies are large, so fetch only the light columns.

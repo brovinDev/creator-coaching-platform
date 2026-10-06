@@ -1,26 +1,45 @@
 /**
- * Merge tags shared by the Beefree editor (client) and the sender (server).
+ * Placeholders shared by the editors (client) and the sender (server).
  * Keep this file free of server-only imports.
+ *
+ * The documented form is {contact.firstname}. The older {{name}} style (from the first
+ * Beefree version) still renders so saved designs keep working.
  */
-export const EMAIL_MERGE_TAGS = [
-  { name: "Learner name", key: "name" },
-  { name: "Learner email", key: "email" },
-  { name: "Creator name", key: "creator_name" },
-  { name: "Service name", key: "service_name" },
-  { name: "Amount paid", key: "amount" },
-  { name: "Transaction ID", key: "transaction_id" },
-  { name: "Dashboard link", key: "dashboard_url" },
+export const EMAIL_PLACEHOLDERS = [
+  { key: "contact.firstname", label: "Learner first name" },
+  { key: "contact.lastname", label: "Learner last name" },
+  { key: "contact.fullname", label: "Learner full name" },
+  { key: "contact.email", label: "Learner email" },
+  { key: "service.name", label: "Service name" },
+  { key: "order.amount", label: "Amount paid" },
+  { key: "order.transaction_id", label: "Transaction ID" },
+  { key: "creator.name", label: "Creator name" },
+  { key: "link.dashboard", label: "Dashboard link" },
 ] as const;
 
-export type EmailMergeKey = (typeof EMAIL_MERGE_TAGS)[number]["key"];
+export type PlaceholderKey = (typeof EMAIL_PLACEHOLDERS)[number]["key"];
+export type PlaceholderValues = Record<PlaceholderKey, string>;
+
+export const placeholderToken = (key: string) => `{${key}}`;
+
+/** Old {{key}} names mapped to their current placeholder. */
+const LEGACY_ALIASES: Record<string, PlaceholderKey> = {
+  name: "contact.fullname",
+  email: "contact.email",
+  service_name: "service.name",
+  amount: "order.amount",
+  transaction_id: "order.transaction_id",
+  creator_name: "creator.name",
+  dashboard_url: "link.dashboard",
+};
 
 /** Shape Beefree expects for its `mergeTags` config. */
-export const BEEFREE_MERGE_TAGS = EMAIL_MERGE_TAGS.map((t) => ({
-  name: t.name,
-  value: `{{${t.key}}}`,
+export const BEEFREE_MERGE_TAGS = EMAIL_PLACEHOLDERS.map((p) => ({
+  name: p.label,
+  value: placeholderToken(p.key),
 }));
 
-function escapeHtml(value: string) {
+export function escapeHtml(value: string) {
   return value
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -29,20 +48,30 @@ function escapeHtml(value: string) {
     .replace(/'/g, "&#39;");
 }
 
+/** First/last name from a full name; the first word is the first name. */
+export function splitName(fullName: string) {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  return { first: parts[0] || "", last: parts.slice(1).join(" ") };
+}
+
 /**
- * Replaces {{tags}} with HTML-escaped values. Also matches the URL-encoded form
- * (%7B%7B…%7D%7D) because editors may encode braces when a tag is used inside a link.
- * Unknown tags are left untouched.
+ * Replaces placeholders with values. Matches {contact.firstname}, {{contact.firstname}} and the
+ * legacy {{name}}, plus the URL-encoded braces (%7B…%7D) editors produce inside links.
+ * Unknown placeholders are left untouched. `escape` HTML-escapes the values (for HTML bodies);
+ * leave it off for plain text and subjects.
  */
-export function renderMergeTags(
+export function renderPlaceholders(
   template: string,
-  values: Partial<Record<EmailMergeKey, string>>
+  values: Partial<Record<string, string>>,
+  { escape = true }: { escape?: boolean } = {}
 ) {
   return template.replace(
-    /(?:\{\{|%7B%7B)\s*([a-z_]+)\s*(?:\}\}|%7D%7D)/gi,
-    (match, key: string) => {
-      const value = values[key.toLowerCase() as EmailMergeKey];
-      return value === undefined ? match : escapeHtml(value);
+    /(?:\{\{|%7B%7B|\{|%7B)\s*([a-z_]+(?:\.[a-z_]+)?)\s*(?:\}\}|%7D%7D|\}|%7D)/gi,
+    (match, rawKey: string) => {
+      const key = rawKey.toLowerCase();
+      const value = values[key] ?? values[LEGACY_ALIASES[key]];
+      if (value === undefined) return match;
+      return escape ? escapeHtml(value) : value;
     }
   );
 }

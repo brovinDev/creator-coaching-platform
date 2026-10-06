@@ -1,20 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getNocodeToken } from "@/lib/auth";
 import { nocodeDb } from "@/lib/nocode/db";
-import { requireCreator } from "@/lib/email-automation";
+import { requireCreator, templateFieldsFromBody, templateForEditor } from "@/lib/email-automation";
 
-/** The creator's default confirmation email, used by every service without its own design. */
+/** The creator's default confirmation email, used by every service without its own email. */
 export async function GET() {
   const creator = await requireCreator();
   if ("error" in creator) return NextResponse.json({ error: creator.error }, { status: creator.status });
 
   const row = await nocodeDb.creatorEmailSettings.findUnique({ creator_id: creator.user.id }, await getNocodeToken());
+  const editor = templateForEditor(row, "default_");
   return NextResponse.json({
     service_title: "",
-    exists: !!row?.default_html,
-    subject: String(row?.default_subject || ""),
-    design_json: (row?.default_design_json as string) || null,
+    exists: !!(editor.subject && (editor.format === "html" ? row?.default_html : editor.body_text)),
     enabled: true,
+    ...editor,
   });
 }
 
@@ -22,11 +22,7 @@ export async function PUT(req: NextRequest) {
   const creator = await requireCreator();
   if ("error" in creator) return NextResponse.json({ error: creator.error }, { status: creator.status });
 
-  const body = await req.json();
-  const data: Record<string, unknown> = {};
-  if (typeof body.subject === "string") data.default_subject = body.subject.slice(0, 200);
-  if (typeof body.design_json === "string") data.default_design_json = body.design_json;
-  if (typeof body.html === "string") data.default_html = body.html;
+  const data = templateFieldsFromBody(await req.json(), "default_");
 
   const token = await getNocodeToken();
   try {
