@@ -17,6 +17,8 @@ import {
   Ticket,
   Menu,
   X,
+  Zap,
+  ChevronDown,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -32,6 +34,8 @@ const navItems = [
   { label: "Settings", href: "/creator/settings", icon: Settings },
 ];
 
+const automationItems = [{ label: "Email Automation", href: "/creator/automation/email" }];
+
 interface SidebarProps {
   user: { name: string; email: string };
 }
@@ -39,6 +43,9 @@ interface SidebarProps {
 export function CreatorSidebar({ user }: SidebarProps) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const onAutomation = pathname.startsWith("/creator/automation");
+  // Stays open while you are inside it; otherwise it follows the last click.
+  const [automationOpen, setAutomationOpen] = useState(onAutomation);
 
   return (
     <>
@@ -72,7 +79,7 @@ export function CreatorSidebar({ user }: SidebarProps) {
         </div>
 
         <nav className="flex-1 px-3 py-4 space-y-1">
-          {navItems.map((item) => {
+          {navItems.filter((i) => i.href !== "/creator/settings").map((item) => {
             const isActive = pathname === item.href || (item.href !== "/creator" && pathname.startsWith(item.href));
             return (
               <Link
@@ -84,6 +91,65 @@ export function CreatorSidebar({ user }: SidebarProps) {
                   isActive
                     ? "bg-indigo-50 text-indigo-700"
                     : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                )}
+              >
+                <item.icon className="h-5 w-5" />
+                {item.label}
+              </Link>
+            );
+          })}
+
+          <div>
+            <button
+              type="button"
+              onClick={() => setAutomationOpen((v) => !v)}
+              aria-expanded={automationOpen || onAutomation}
+              className={cn(
+                "flex w-full items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer",
+                onAutomation ? "bg-indigo-50 text-indigo-700" : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+              )}
+            >
+              <Zap className="h-5 w-5" />
+              <span className="flex-1 text-left">Automation</span>
+              <ChevronDown
+                className={cn("h-4 w-4 transition-transform", (automationOpen || onAutomation) && "rotate-180")}
+              />
+            </button>
+            {(automationOpen || onAutomation) && (
+              <div className="mt-1 space-y-1">
+                {automationItems.map((item) => {
+                  const isActive = pathname.startsWith(item.href);
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setMobileOpen(false)}
+                      className={cn(
+                        "flex items-center gap-3 rounded-lg py-2 pl-11 pr-3 text-sm font-medium transition-colors",
+                        isActive
+                          ? "bg-indigo-50 text-indigo-700"
+                          : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                      )}
+                    >
+                      <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {navItems.filter((i) => i.href === "/creator/settings").map((item) => {
+            const isActive = pathname.startsWith(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setMobileOpen(false)}
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                  isActive ? "bg-indigo-50 text-indigo-700" : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                 )}
               >
                 <item.icon className="h-5 w-5" />

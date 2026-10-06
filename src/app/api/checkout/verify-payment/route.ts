@@ -1,12 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { nocodeDb } from "@/lib/nocode/db";
+import { auth } from "@/lib/auth";
+import { sendRegistrationEmails } from "@/lib/registration-emails";
 import crypto from "crypto";
-import {
-  sendEmail,
-  paymentConfirmationEmail,
-  enrollmentEmail,
-  creatorPurchaseNotificationEmail,
-} from "@/lib/email";
 
 const SYSTEM_TOKEN = process.env.NOCODE_SYSTEM_TOKEN || "";
 
@@ -63,44 +59,38 @@ export async function POST(req: NextRequest) {
     }
 
     const course = await nocodeDb.courses.findUnique({ id: String(order.course_id) }, SYSTEM_TOKEN);
-    const userProfile = await nocodeDb.userProfiles.findUnique({ user_id: String(order.user_id) }, SYSTEM_TOKEN);
+    const service = serviceId
+      ? await nocodeDb.services.findUnique({ id: serviceId }, SYSTEM_TOKEN)
+      : null;
 
-    const userName = (userProfile?.name as string) || "Student";
-    const userEmail = (userProfile?.email as string) || "";
-    const courseTitle = (course?.title as string) || "Course";
     const courseSlug = (course?.slug as string) || "";
+    const serviceName = String(service?.title || course?.title || "Course");
     const amount = Number(order.amount) || 0;
 
-    if (userEmail) {
-      const paymentEmail = paymentConfirmationEmail(userName, courseTitle, amount);
-      sendEmail({ to: userEmail, ...paymentEmail });
+    // The learner is the signed-in user who started checkout, so the session is the
+    // reliable source of their email. Only trust it when it matches the order.
+    const session = await auth();
+    const sessionMatchesOrder = session?.user?.id === String(order.user_id);
 
-      const enrollEmail = enrollmentEmail(userName, courseTitle);
-      sendEmail({ to: userEmail, ...enrollEmail });
-    }
-
-    if (course?.creator_id) {
-      const creatorProfile = await nocodeDb.userProfiles.findUnique(
-        { user_id: String(course.creator_id) },
-        SYSTEM_TOKEN
-      );
-      if (creatorProfile?.email) {
-        const creatorEmail = creatorPurchaseNotificationEmail(
-          (creatorProfile.name as string) || "Creator",
-          userName,
-          courseTitle,
-          amount
-        );
-        sendEmail({ to: creatorProfile.email as string, ...creatorEmail });
-      }
-    }
+    after(() =>
+      sendRegistrationEmails({
+        userId: String(order.user_id),
+        learner: sessionMatchesOrder
+          ? { name: session?.user?.name, email: session?.user?.email }
+          : undefined,
+        serviceId,
+        courseId: String(order.course_id),
+        amount,
+        transactionId: razorpayPaymentId,
+      })
+    );
 
     return NextResponse.json({
       message: "Payment verified and enrollment created",
       courseSlug,
       transactionId: razorpayPaymentId,
       amount,
-      serviceName: courseTitle,
+      serviceName,
       paymentMethod: "Razorpay",
     });
   } catch (error) {

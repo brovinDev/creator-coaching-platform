@@ -2,6 +2,7 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { nocodeSignin } from "./nocode/client";
 import { nocodeDb } from "./nocode/db";
+import { syncProfileContact } from "./profile-contact";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
@@ -29,6 +30,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           const profile = await nocodeDb.userProfiles
             .findUnique({ user_id: user.id }, systemToken)
             .catch(() => null);
+
+          await syncProfileContact(profile, user);
 
           return {
             id: user.id,

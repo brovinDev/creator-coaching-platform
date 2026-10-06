@@ -26,6 +26,8 @@ export const MODULES = {
   user_profiles: "user_profiles",
   services: "services",
   coupons: "coupons",
+  service_email_templates: "service_email_templates",
+  creator_email_settings: "creator_email_settings",
 } as const;
 
 type Row = Record<string, unknown>;
@@ -141,4 +143,6 @@ export const nocodeDb = {
   userProfiles: new NocodeModel(MODULES.user_profiles),
   services: new NocodeModel(MODULES.services),
   coupons: new NocodeModel(MODULES.coupons),
+  serviceEmailTemplates: new NocodeModel(MODULES.service_email_templates),
+  creatorEmailSettings: new NocodeModel(MODULES.creator_email_settings),
 };

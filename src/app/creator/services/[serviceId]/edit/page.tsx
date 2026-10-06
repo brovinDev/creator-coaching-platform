@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 
+// Beefree touches window on load, so it must never render on the server.
+
 type Tab = "details" | "payment" | "success";
 type ServiceType = "one-time" | "subscription" | "free";
 
@@ -722,6 +724,8 @@ export default function EditServicePage() {
               </div>
             </div>
           )}
+
+          {/* ========== EMAILS TAB ========== */}
 
           {/* ========== PAYMENT SUCCESS PAGE TAB ========== */}
           {activeTab === "success" && (

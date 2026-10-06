@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { nocodeDb } from "@/lib/nocode/db";
 import { auth, getNocodeToken } from "@/lib/auth";
-import { sendEmail, enrollmentEmail } from "@/lib/email";
+import { sendRegistrationEmails } from "@/lib/registration-emails";
 
 export async function POST(req: NextRequest) {
   try {
@@ -47,15 +47,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    let enrollmentName = "Course";
-    if (serviceId) {
-      const service = await nocodeDb.services.findUnique({ id: serviceId }, token);
-      if (service) enrollmentName = String(service.title || "Service");
-    } else if (courseId) {
-      const course = await nocodeDb.courses.findUnique({ id: courseId }, token);
-      if (course) enrollmentName = String(course.title || "Course");
-    }
-
     if (couponId) {
       const coupon = await nocodeDb.coupons.findUnique({ id: couponId }, token);
       if (coupon) {
@@ -63,10 +54,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    if (session.user.email) {
-      const emailContent = enrollmentEmail(session.user.name || "Student", enrollmentName);
-      sendEmail({ to: session.user.email, ...emailContent });
-    }
+    after(() =>
+      sendRegistrationEmails({
+        userId: session.user.id,
+        learner: { name: session.user.name, email: session.user.email },
+        serviceId,
+        courseId,
+      })
+    );
 
     return NextResponse.json({ message: "Enrolled successfully" });
   } catch (error) {

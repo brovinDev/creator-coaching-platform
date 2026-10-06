@@ -29,6 +29,9 @@ const modules = [
     fields: [
       { name: "user_id", label: "User ID", type: "text", required: true },
       { name: "role", label: "Role", type: "text", required: true },
+      { name: "email", label: "Email", type: "text" },
+      { name: "first_name", label: "First Name", type: "text" },
+      { name: "last_name", label: "Last Name", type: "text" },
       { name: "bio", label: "Bio", type: "longText" },
       { name: "avatar", label: "Avatar", type: "text" },
       { name: "razorpay_customer_id", label: "Razorpay Customer ID", type: "text" },
@@ -169,6 +172,17 @@ const modules = [
       { name: "end_date", label: "End Date", type: "text", required: true },
       { name: "status", label: "Status", type: "text", required: true },
       { name: "creator_id", label: "Creator ID", type: "text", required: true },
+    ],
+  },
+  {
+    table_name: "service_email_templates",
+    module_label: "Service Email Templates",
+    fields: [
+      { name: "service_id", label: "Service ID", type: "text", required: true },
+      { name: "subject", label: "Subject", type: "text" },
+      { name: "design_json", label: "Design JSON", type: "longText" },
+      { name: "html", label: "HTML", type: "longText" },
+      { name: "enabled", label: "Enabled", type: "boolean" },
     ],
   },
   {
