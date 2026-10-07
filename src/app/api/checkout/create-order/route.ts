@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { nocodeDb } from "@/lib/nocode/db";
 import { auth, getNocodeToken } from "@/lib/auth";
+import { loadUsableCoupon, serviceTotal } from "@/lib/coupons";
 import Razorpay from "razorpay";
 
 const razorpay = new Razorpay({
@@ -32,9 +33,13 @@ export async function POST(req: NextRequest) {
     if (serviceId) {
       const service = await nocodeDb.services.findUnique({ id: serviceId }, token);
       if (service) {
-        const svcPrice = service.discounted_price ? Number(service.discounted_price) : Number(service.price) || 0;
-        const gst = service.enable_gst ? Math.round(svcPrice * 0.18) : 0;
-        price = svcPrice + gst;
+        let coupon: Record<string, unknown> | null = null;
+        if (couponId) {
+          const result = await loadUsableCoupon(String(couponId), String(serviceId));
+          if ("error" in result) return NextResponse.json({ error: result.error }, { status: 400 });
+          coupon = result.coupon;
+        }
+        price = serviceTotal(service, coupon);
       }
     }
 
@@ -80,13 +85,6 @@ export async function POST(req: NextRequest) {
       },
       token
     );
-
-    if (couponId) {
-      const coupon = await nocodeDb.coupons.findUnique({ id: couponId }, token);
-      if (coupon) {
-        await nocodeDb.coupons.update(couponId, { usage_count: Number(coupon.usage_count || 0) + 1 }, token);
-      }
-    }
 
     return NextResponse.json({
       razorpayOrderId: razorpayOrder.id,

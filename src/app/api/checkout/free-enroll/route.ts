@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import { nocodeDb } from "@/lib/nocode/db";
 import { auth, getNocodeToken } from "@/lib/auth";
+import { loadUsableCoupon, redeemCoupon, serviceTotal } from "@/lib/coupons";
 import { sendRegistrationEmails } from "@/lib/registration-emails";
 
 export async function POST(req: NextRequest) {
@@ -18,6 +19,19 @@ export async function POST(req: NextRequest) {
     }
 
     if (serviceId) {
+      // Only services that cost nothing (after any coupon) can be joined without paying.
+      const service = await nocodeDb.services.findUnique({ id: serviceId }, token);
+      if (!service) return NextResponse.json({ error: "Service not found" }, { status: 404 });
+      let coupon: Record<string, unknown> | null = null;
+      if (couponId) {
+        const result = await loadUsableCoupon(String(couponId), String(serviceId));
+        if ("error" in result) return NextResponse.json({ error: result.error }, { status: 400 });
+        coupon = result.coupon;
+      }
+      if (service.service_type !== "free" && serviceTotal(service, coupon) > 0) {
+        return NextResponse.json({ error: "Payment is required for this service" }, { status: 402 });
+      }
+
       const existing = await nocodeDb.enrollments.findMany(
         { where: { user_id: session.user.id, service_id: serviceId } },
         token
@@ -47,12 +61,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (couponId) {
-      const coupon = await nocodeDb.coupons.findUnique({ id: couponId }, token);
-      if (coupon) {
-        await nocodeDb.coupons.update(couponId, { usage_count: Number(coupon.usage_count || 0) + 1 }, token);
-      }
-    }
+    if (couponId) await redeemCoupon(String(couponId));
 
     after(() =>
       sendRegistrationEmails({

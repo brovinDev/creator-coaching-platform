@@ -2,6 +2,7 @@ import { NextRequest, NextResponse, after } from "next/server";
 import { nocodeDb } from "@/lib/nocode/db";
 import { auth } from "@/lib/auth";
 import { sendRegistrationEmails } from "@/lib/registration-emails";
+import { redeemCoupon } from "@/lib/coupons";
 import crypto from "crypto";
 
 const SYSTEM_TOKEN = process.env.NOCODE_SYSTEM_TOKEN || "";
@@ -57,6 +58,8 @@ export async function POST(req: NextRequest) {
         SYSTEM_TOKEN
       );
     }
+
+    if (order.coupon_id) await redeemCoupon(String(order.coupon_id));
 
     const course = await nocodeDb.courses.findUnique({ id: String(order.course_id) }, SYSTEM_TOKEN);
     const service = serviceId
