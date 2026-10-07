@@ -28,6 +28,8 @@ interface Comment {
   userName: string;
   content: string;
   createdAt: string;
+  /** Empty for a top-level comment; otherwise the comment this is a reply under. */
+  parentId: string;
 }
 
 function timeAgo(value: string) {
@@ -61,6 +63,9 @@ function Comments({ post, onCount }: { post: Post; onCount: (n: number) => void 
   const [comments, setComments] = useState<Comment[] | null>(null);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
+  // The comment being answered; null writes a new top-level comment.
+  const [replyingTo, setReplyingTo] = useState<Comment | null>(null);
+  const input = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetch(`/api/feed/${post.id}/comments`)
@@ -79,7 +84,7 @@ function Comments({ post, onCount }: { post: Post; onCount: (n: number) => void 
       const res = await fetch(`/api/feed/${post.id}/comments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: text }),
+        body: JSON.stringify({ content: text, ...(replyingTo ? { parentId: replyingTo.id } : {}) }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Could not comment");
@@ -87,6 +92,7 @@ function Comments({ post, onCount }: { post: Post; onCount: (n: number) => void 
       setComments(next);
       onCount(next.length);
       setText("");
+      setReplyingTo(null);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not comment");
     } finally {
@@ -94,32 +100,61 @@ function Comments({ post, onCount }: { post: Post; onCount: (n: number) => void 
     }
   }
 
+  function startReply(comment: Comment) {
+    setReplyingTo(comment);
+    input.current?.focus();
+  }
+
+  const topLevel = (comments || []).filter((c) => !c.parentId);
+  const repliesOf = (id: string) => (comments || []).filter((c) => c.parentId === id);
+
+  const row = (c: Comment, small = false) => (
+    <div key={c.id} className="flex gap-2">
+      <Avatar name={c.userName} size={small ? "h-7 w-7 text-xs" : "h-8 w-8 text-xs"} />
+      <div className="min-w-0">
+        <div className="rounded-xl bg-gray-50 px-3 py-2">
+          <p className="text-xs font-semibold text-gray-900">
+            {c.userName} <span className="font-normal text-gray-400">{timeAgo(c.createdAt)}</span>
+          </p>
+          <p className="whitespace-pre-wrap break-words text-sm text-gray-700">{c.content}</p>
+        </div>
+        <button type="button" onClick={() => startReply(c)} className="ml-3 mt-0.5 cursor-pointer text-xs font-medium text-gray-500 hover:text-gray-800">
+          Reply
+        </button>
+      </div>
+    </div>
+  );
+
   return (
     <div className="border-t border-gray-100 px-4 py-3 sm:px-5">
       {comments === null ? (
         <Loader2 className="mx-auto h-4 w-4 animate-spin text-gray-400" />
       ) : (
         <div className="space-y-3">
-          {comments.map((c) => (
-            <div key={c.id} className="flex gap-2">
-              <Avatar name={c.userName} size="h-8 w-8 text-xs" />
-              <div className="min-w-0 rounded-xl bg-gray-50 px-3 py-2">
-                <p className="text-xs font-semibold text-gray-900">
-                  {c.userName} <span className="font-normal text-gray-400">{timeAgo(c.createdAt)}</span>
-                </p>
-                <p className="whitespace-pre-wrap break-words text-sm text-gray-700">{c.content}</p>
-              </div>
+          {topLevel.map((c) => (
+            <div key={c.id} className="space-y-2">
+              {row(c)}
+              {repliesOf(c.id).length > 0 && <div className="ml-10 space-y-2">{repliesOf(c.id).map((r) => row(r, true))}</div>}
             </div>
           ))}
         </div>
       )}
+      {replyingTo && (
+        <p className="mt-3 flex items-center justify-between rounded-lg bg-gray-50 px-3 py-1.5 text-xs text-gray-600">
+          <span className="truncate">Replying to {replyingTo.userName}</span>
+          <button type="button" onClick={() => setReplyingTo(null)} className="ml-2 cursor-pointer font-medium text-gray-500 hover:text-gray-800">
+            Cancel
+          </button>
+        </p>
+      )}
       <div className="mt-3 flex gap-2">
         <input
+          ref={input}
           value={text}
           maxLength={1000}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && send()}
-          placeholder="Write a comment..."
+          placeholder={replyingTo ? `Reply to ${replyingTo.userName}...` : "Write a comment..."}
           className="min-w-0 flex-1 rounded-full border border-gray-300 px-4 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
         />
         <button

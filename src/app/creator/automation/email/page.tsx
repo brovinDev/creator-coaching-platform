@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { cn } from "@/lib/utils";
-import { REMINDERS, type ReminderKey } from "@/lib/workshop-reminder-schedule";
+import { LIVE_EMAILS, type EmailKind } from "@/lib/email-notifications";
 
 interface ServiceRow {
   id: string;
@@ -19,9 +19,9 @@ interface ServiceRow {
   updated_at: string | null;
 }
 
-type ReminderSetting = (typeof REMINDERS)[number]["setting"];
+type EmailSetting = string;
 
-interface Settings extends Record<ReminderSetting, boolean> {
+interface Settings extends Record<EmailSetting, boolean | string> {
   from_name: string;
   reply_to: string;
   confirmation_enabled: boolean;
@@ -58,22 +58,19 @@ function Toggle({ checked, onChange, disabled, label }: {
 
 // Same list as TagMango. Only the confirmation email has a trigger in this app so far;
 // the rest are shown for parity but stay switched off until their events exist.
-// The three workshop reminders are live (REMINDERS); the rest of the list is parity only.
+// The workshop reminders, the post workshop email and the comment notifications are live (LIVE_EMAILS); the rest of the list is parity only.
 const UPCOMING_TEMPLATE_TYPES = [
   "Reminder Email on Purchase Drop-off",
   "Reminder Email on Failed Purchase",
   "Reminder Email One Day Before Expiry",
   "Notification Email on New Post Creation",
-  "Notification Email on Post Comment",
   "Notification Email on Comment Like",
-  "Notification Email on Comment Reply",
   "Notification Email on Tagging Someone In A Comment",
   "Promotional Email on Service Creation",
   "Notification Email on Single Workshop Creation",
   "Notification Email on Recurring Workshop Creation",
   "Notification Email on Rescheduling a workshop",
   "Notification Email on Workshop Cancellation",
-  "Post Workshop Email 15 mins after Workshop",
   "Notification Email after subscription expired",
   "Notification Email for 10% course completion",
   "Notification Email for 50% course completion",
@@ -125,9 +122,7 @@ export default function EmailAutomationPage() {
     from_name: "",
     reply_to: "",
     confirmation_enabled: true,
-    reminder_24h_enabled: true,
-    reminder_1h_enabled: true,
-    reminder_5m_enabled: true,
+    ...Object.fromEntries(LIVE_EMAILS.map((e) => [e.setting, true])),
   });
   const [saved, setSaved] = useState({ from_name: "", reply_to: "" });
   const [savingSettings, setSavingSettings] = useState(false);
@@ -135,8 +130,8 @@ export default function EmailAutomationPage() {
   const [expanded, setExpanded] = useState(true);
   const [hasDefault, setHasDefault] = useState(false);
   const [resetFor, setResetFor] = useState<ServiceRow | null>(null);
-  const [customReminders, setCustomReminders] = useState<Record<ReminderKey, boolean>>({ "24h": false, "1h": false, "5m": false });
-  const [resetReminder, setResetReminder] = useState<ReminderKey | null>(null);
+  const [customReminders, setCustomReminders] = useState<Record<string, boolean>>({});
+  const [resetReminder, setResetReminder] = useState<EmailKind | null>(null);
   const [resetting, setResetting] = useState(false);
   const [importFor, setImportFor] = useState<ServiceRow | null>(null);
   const [importFrom, setImportFrom] = useState("");
@@ -157,9 +152,8 @@ export default function EmailAutomationPage() {
         if (!settingsRes.ok) throw new Error("Could not load email settings");
         const s: Settings = await settingsRes.json();
         setSettings(s);
-        if ((s as Settings & { reminder_custom?: Record<ReminderKey, boolean> }).reminder_custom) {
-          setCustomReminders((s as Settings & { reminder_custom: Record<ReminderKey, boolean> }).reminder_custom);
-        }
+        const custom = (s as unknown as { reminder_custom?: Record<string, boolean> }).reminder_custom;
+        if (custom) setCustomReminders(custom);
         setSaved({ from_name: s.from_name, reply_to: s.reply_to });
         await loadServices();
       } catch (err) {
@@ -207,7 +201,7 @@ export default function EmailAutomationPage() {
     }
   }
 
-  async function toggleReminder(setting: ReminderSetting, next: boolean) {
+  async function toggleReminder(setting: EmailSetting, next: boolean) {
     const previous = settings[setting];
     setSettings((s) => ({ ...s, [setting]: next }));
     const res = await fetch("/api/email-automation/settings", {
@@ -217,7 +211,7 @@ export default function EmailAutomationPage() {
     });
     if (!res.ok) {
       setSettings((s) => ({ ...s, [setting]: previous }));
-      toast.error("Failed to update the reminder");
+      toast.error("Failed to update the email");
     }
   }
 
@@ -227,9 +221,9 @@ export default function EmailAutomationPage() {
       const res = await fetch(`/api/email-automation/reminders/${resetReminder}`, { method: "DELETE" });
       if (!res.ok) throw new Error();
       setCustomReminders((c) => ({ ...c, [resetReminder]: false }));
-      toast.success("Reset to the built-in reminder");
+      toast.success("Reset to the built-in email");
     } catch {
-      toast.error("Failed to reset the reminder");
+      toast.error("Failed to reset the email");
     } finally {
       setResetReminder(null);
     }
@@ -457,14 +451,12 @@ export default function EmailAutomationPage() {
               </div>
             )}
 
-            {REMINDERS.map((reminder) => (
+            {LIVE_EMAILS.map((reminder) => (
               <div key={reminder.key} className="flex items-center border-b border-gray-100 px-6 py-4">
                 <span className="mr-3 h-6 w-6" />
                 <div className="flex-1">
                   <p className="text-base font-medium text-gray-900">{reminder.label}</p>
-                  <p className="text-sm text-gray-500">
-                    Sent to learners of the linked services {reminder.phrase.replace("in ", "")} before each session.
-                  </p>
+                  <p className="text-sm text-gray-500">{reminder.description}</p>
                   <span
                     className={cn(
                       "mt-2 inline-block rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase text-white",
@@ -476,7 +468,7 @@ export default function EmailAutomationPage() {
                 </div>
                 <div className="flex w-32 justify-center">
                   <Toggle
-                    checked={settings[reminder.setting]}
+                    checked={settings[reminder.setting] !== false}
                     onChange={(next) => toggleReminder(reminder.setting, next)}
                     label={reminder.label}
                   />
@@ -486,7 +478,7 @@ export default function EmailAutomationPage() {
                     <Pencil className="h-4 w-4" />
                   </IconButton>
                   <IconButton
-                    label={customReminders[reminder.key] ? "Reset to the built-in reminder" : "No custom email to reset"}
+                    label={customReminders[reminder.key] ? "Reset to the built-in email" : "No custom email to reset"}
                     disabled={!customReminders[reminder.key]}
                     onClick={() => setResetReminder(reminder.key)}
                   >
@@ -564,10 +556,10 @@ export default function EmailAutomationPage() {
         </div>
       </Modal>
 
-      <Modal open={!!resetReminder} onClose={() => setResetReminder(null)} title="Reset reminder email">
+      <Modal open={!!resetReminder} onClose={() => setResetReminder(null)} title="Reset email">
         <p className="text-sm text-gray-600">
-          Reset <strong>{REMINDERS.find((r) => r.key === resetReminder)?.label}</strong>? Your version will be deleted and the
-          built-in reminder will be sent instead.
+          Reset <strong>{LIVE_EMAILS.find((r) => r.key === resetReminder)?.label}</strong>? Your version will be deleted and the
+          built-in email will be sent instead.
         </p>
         <div className="mt-5 flex justify-end gap-3">
           <Button variant="outline" onClick={() => setResetReminder(null)}>

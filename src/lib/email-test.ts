@@ -1,5 +1,8 @@
 import { nocodeDb } from "@/lib/nocode/db";
 import { sendEmail, formatAmount } from "@/lib/email";
+import { splitName } from "@/lib/email-merge-tags";
+import type { EmailKind } from "@/lib/email-notifications";
+import { REMINDERS } from "@/lib/workshop-reminder-schedule";
 import {
   buildPlaceholderValues,
   buildReminderPlaceholderValues,
@@ -40,26 +43,47 @@ export async function sendTemplateTest(opts: {
   });
 }
 
-/** The same, for a workshop reminder: sample workshop details, sent to the creator only. */
-export async function sendReminderTest(opts: {
-  user: { id: string; name: string; email: string };
-  token: string;
-  content: EmailTemplateContent;
-  startsIn: string;
-}) {
-  const { user, token, content, startsIn } = opts;
-  const settings = await nocodeDb.creatorEmailSettings.findUnique({ creator_id: user.id }, token).catch(() => null);
-  const values = buildReminderPlaceholderValues({
+/** Sample values for each kind of notification, so a test email reads like the real thing. */
+function sampleValues(kind: EmailKind, user: { name: string; email: string }): Record<string, string> {
+  const { first } = splitName(user.name || "");
+  const app = process.env.NEXT_PUBLIC_APP_URL;
+  if (kind === "post_comment" || kind === "comment_reply") {
+    return {
+      "contact.firstname": first || "there",
+      "contact.fullname": user.name || "there",
+      "contact.email": user.email,
+      "commenter.name": "Asha Rao",
+      "comment.text": "This was really helpful, thank you!",
+      "post.excerpt": "Welcome to the new batch. Here is what we cover this week...",
+      "replier.name": "Asha Rao",
+      "reply.text": "Thanks, I will try that today.",
+      "comment.excerpt": "How do I get started with the first lesson?",
+      "link.feed": `${app}/creator/feed`,
+      "link.dashboard": `${app}/creator`,
+    };
+  }
+  return buildReminderPlaceholderValues({
     learnerName: user.name || "",
     learnerEmail: user.email,
     workshopTitle: "Your workshop",
     hostName: user.name || "Your name",
     date: "Thu, 8 Oct",
     time: "7:00 pm IST",
-    startsIn,
-    link: `${process.env.NEXT_PUBLIC_APP_URL}/student/workshops`,
+    startsIn: REMINDERS.find((r) => r.key === kind)?.phrase ?? "",
+    link: `${app}/student/workshops`,
   });
-  const rendered = renderEmailTemplate(content, values);
+}
+
+/** Sends a notification or reminder as it currently stands in an editor to the creator only, with sample values. */
+export async function sendKindTest(opts: {
+  user: { id: string; name: string; email: string };
+  token: string;
+  content: EmailTemplateContent;
+  kind: EmailKind;
+}) {
+  const { user, token, content, kind } = opts;
+  const settings = await nocodeDb.creatorEmailSettings.findUnique({ creator_id: user.id }, token).catch(() => null);
+  const rendered = renderEmailTemplate(content, sampleValues(kind, user));
   await sendEmail({
     to: user.email,
     ...rendered,

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getNocodeToken } from "@/lib/auth";
 import { nocodeDb } from "@/lib/nocode/db";
 import { isValidEmail, requireCreator } from "@/lib/email-automation";
-import { REMINDERS } from "@/lib/workshop-reminder-schedule";
+import { LIVE_EMAILS } from "@/lib/email-notifications";
 import { contentFromRow } from "@/lib/email-template-render";
 
 export async function GET() {
@@ -16,7 +16,7 @@ export async function GET() {
     .findMany({ where: { creator_id: creator.user.id } }, token)
     .catch(() => []);
   const custom = Object.fromEntries(
-    REMINDERS.map((r) => [
+    LIVE_EMAILS.map((r) => [
       r.key,
       templates.some((t) => t.reminder === r.key && t.enabled !== false && !!contentFromRow(t, "")),
     ])
@@ -28,7 +28,7 @@ export async function GET() {
     // Unset means on.
     confirmation_enabled: row?.confirmation_enabled !== false,
     // Workshop reminders, also on unless switched off.
-    ...Object.fromEntries(REMINDERS.map((r) => [r.setting, row?.[r.setting] !== false])),
+    ...Object.fromEntries(LIVE_EMAILS.map((e) => [e.setting, row?.[e.setting] !== false])),
   });
 }
 
@@ -51,8 +51,8 @@ export async function PUT(req: NextRequest) {
     data.reply_to = replyTo;
   }
   if (typeof body.confirmation_enabled === "boolean") data.confirmation_enabled = body.confirmation_enabled;
-  for (const reminder of REMINDERS) {
-    if (typeof body[reminder.setting] === "boolean") data[reminder.setting] = body[reminder.setting];
+  for (const email of LIVE_EMAILS) {
+    if (typeof body[email.setting] === "boolean") data[email.setting] = body[email.setting];
   }
 
   const token = await getNocodeToken();

@@ -32,6 +32,43 @@ export const REMINDER_PLACEHOLDERS = [
   { key: "link.dashboard", label: "Dashboard link" },
 ] as const;
 
+/** Post workshop email (sent after a session). */
+export const POST_WORKSHOP_PLACEHOLDERS = [
+  { key: "contact.firstname", label: "Learner first name" },
+  { key: "contact.lastname", label: "Learner last name" },
+  { key: "contact.fullname", label: "Learner full name" },
+  { key: "contact.email", label: "Learner email" },
+  { key: "workshop.title", label: "Workshop title" },
+  { key: "workshop.host", label: "Host name" },
+  { key: "workshop.date", label: "Session date" },
+  { key: "workshop.time", label: "Session start time" },
+  { key: "link.dashboard", label: "Dashboard link" },
+] as const;
+
+/** Sent to the post's author when someone comments. */
+export const POST_COMMENT_PLACEHOLDERS = [
+  { key: "contact.firstname", label: "Your first name" },
+  { key: "contact.fullname", label: "Your full name" },
+  { key: "contact.email", label: "Your email" },
+  { key: "commenter.name", label: "Name of the person who commented" },
+  { key: "comment.text", label: "The comment" },
+  { key: "post.excerpt", label: "Start of your post" },
+  { key: "link.feed", label: "Link to the feed" },
+  { key: "link.dashboard", label: "Dashboard link" },
+] as const;
+
+/** Sent to a comment's author when someone replies. */
+export const COMMENT_REPLY_PLACEHOLDERS = [
+  { key: "contact.firstname", label: "Your first name" },
+  { key: "contact.fullname", label: "Your full name" },
+  { key: "contact.email", label: "Your email" },
+  { key: "replier.name", label: "Name of the person who replied" },
+  { key: "reply.text", label: "The reply" },
+  { key: "comment.excerpt", label: "Start of your comment" },
+  { key: "link.feed", label: "Link to the feed" },
+  { key: "link.dashboard", label: "Dashboard link" },
+] as const;
+
 export type PlaceholderKey = (typeof EMAIL_PLACEHOLDERS)[number]["key"];
 export type PlaceholderValues = Record<PlaceholderKey, string>;
 

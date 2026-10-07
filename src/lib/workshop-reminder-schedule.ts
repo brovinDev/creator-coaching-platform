@@ -40,6 +40,15 @@ export function dueReminders(startMs: number, now: number): ReminderKind[] {
   });
 }
 
+/** The post workshop email goes out this long after a session ends. */
+export const AFTER_SESSION_MS = 15 * MINUTE;
+
+/** Whether the post workshop email is due for a session that ended at `endMs`. Same lateness limit as the reminders. */
+export function postWorkshopDue(endMs: number, now: number): boolean {
+  const opens = endMs + AFTER_SESSION_MS;
+  return now >= opens && now < opens + MAX_LATE_MS;
+}
+
 export const isReminderKey = (value: string): value is ReminderKey => REMINDERS.some((r) => r.key === value);
 
 /** What the editor starts from when a creator has not written their own yet. */

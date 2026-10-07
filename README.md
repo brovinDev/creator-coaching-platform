@@ -140,6 +140,22 @@ Learners of a workshop's linked services get a reminder **24 hours**, **1 hour**
 - **Custom wording:** each reminder row in Email Automation has an edit button (same plain-text and visual editor as the confirmation email, saved per creator in `creator_reminder_templates`). Placeholders: `{contact.firstname}`, `{contact.lastname}`, `{contact.fullname}`, `{contact.email}`, `{workshop.title}`, `{workshop.host}`, `{workshop.date}`, `{workshop.time}`, `{workshop.starts_in}`, `{workshop.link}`, `{link.dashboard}`. `{workshop.link}` is the meeting link in the 5 minute reminder and the learner's Workshops page in the others. A custom email that is switched off, or has no subject or body, falls back to the built-in one. Reset removes it.
 - **Needs an email address:** learners only get reminders if their profile has an email, which is saved when they sign in.
 
+## Notification emails
+
+Besides the purchase confirmation and the workshop reminders, three more emails are live in Automation > Email Automation. Each has an on/off switch (on by default), an edit button (same editor as the reminders, saved in `creator_reminder_templates` under the keys `after15m`, `post_comment`, `comment_reply`), a reset button, and a default that the editor opens on.
+
+| Email | Sent to | When |
+|---|---|---|
+| Post Workshop Email 15 mins after Workshop | Learners of the workshop's linked services | 15 minutes after each session ends (same once-only claim and 10 minute lateness limit as the reminders) |
+| Notification Email on Post Comment | The author of the feed post | Someone else comments on it |
+| Notification Email on Comment Reply | The author of the comment | Someone replies to it |
+
+- Nobody is emailed about their own comment or reply. Comment emails go out only if the recipient's profile has an email address (saved when they sign in).
+- Feed comments now support replies, one level deep: a reply to a reply is filed under the original comment but notifies the person it answers.
+- Placeholders: post workshop `{contact.*}`, `{workshop.title}`, `{workshop.host}`, `{workshop.date}`, `{workshop.time}`, `{link.dashboard}`; post comment `{contact.*}`, `{commenter.name}`, `{comment.text}`, `{post.excerpt}`, `{link.feed}`; comment reply `{contact.*}`, `{replier.name}`, `{reply.text}`, `{comment.excerpt}`, `{link.feed}`.
+- The post workshop wording follows the text TagMango uses ("Hope you enjoyed your call with ... for more of ...'s content log on to ...").
+- Every comment sends one email; there is no batching or digest.
+
 ## Payment flow
 
 1. The checkout page asks `POST /api/checkout/create-order` for an order. The server works out the price from the service, any valid coupon and GST, and never trusts the amount the browser sends.

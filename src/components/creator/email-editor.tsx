@@ -7,19 +7,9 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import {
-  BEEFREE_MERGE_TAGS,
-  EMAIL_PLACEHOLDERS,
-  REMINDER_MERGE_TAGS,
-  REMINDER_PLACEHOLDERS,
-  placeholderToken,
-} from "@/lib/email-merge-tags";
-import {
-  REMINDERS,
-  REMINDER_STARTER_BODY,
-  REMINDER_STARTER_SUBJECT,
-  type ReminderKey,
-} from "@/lib/workshop-reminder-schedule";
+import { BEEFREE_MERGE_TAGS, EMAIL_PLACEHOLDERS, placeholderToken } from "@/lib/email-merge-tags";
+import { emailKindInfo, mergeTagsFor, type EmailKind } from "@/lib/email-notifications";
+import { REMINDER_STARTER_BODY, REMINDER_STARTER_SUBJECT } from "@/lib/workshop-reminder-schedule";
 
 const LIST_URL = "/creator/automation/email";
 const BUILDER_ID = "service-email-builder";
@@ -115,15 +105,15 @@ function DesignerPane({
  * With a serviceId it edits that service's email; with a reminder, that workshop reminder
  * (24h / 1h / 5m); with neither, the creator's default confirmation email.
  */
-export default function EmailEditor({ serviceId, reminder }: { serviceId?: string; reminder?: ReminderKey }) {
+export default function EmailEditor({ serviceId, reminder }: { serviceId?: string; reminder?: EmailKind }) {
   const router = useRouter();
   const base = reminder
     ? `/api/email-automation/reminders/${reminder}`
     : serviceId
       ? `/api/services/${serviceId}/email-template`
       : "/api/email-automation/default-template";
-  const reminderInfo = reminder ? REMINDERS.find((r) => r.key === reminder) : undefined;
-  const placeholders = reminder ? REMINDER_PLACEHOLDERS : EMAIL_PLACEHOLDERS;
+  const reminderInfo = reminder ? emailKindInfo(reminder) : undefined;
+  const placeholders = reminderInfo ? reminderInfo.placeholders : EMAIL_PLACEHOLDERS;
   const starterSubject = reminder ? REMINDER_STARTER_SUBJECT : STARTER_SUBJECT;
   const starterBody = reminder ? REMINDER_STARTER_BODY : STARTER_BODY;
 
@@ -379,8 +369,8 @@ export default function EmailEditor({ serviceId, reminder }: { serviceId?: strin
             )}
             {reminder && (
               <p className="rounded-lg bg-gray-50 p-3 text-xs text-gray-600">
-                Sent to learners of a workshop&apos;s linked services {reminderInfo?.phrase.replace("in ", "")} before each session.
-                Until you save your own version, the built-in reminder is sent. Turn the reminder on or off from the list page.
+                {reminderInfo?.description} Until you save your own version, the built-in email is sent. Turn it on or off
+                from the list page.
               </p>
             )}
 
@@ -529,7 +519,7 @@ export default function EmailEditor({ serviceId, reminder }: { serviceId?: strin
               {designer && (
                 <DesignerPane
                   session={designer}
-                  mergeTags={reminder ? REMINDER_MERGE_TAGS : BEEFREE_MERGE_TAGS}
+                  mergeTags={reminder ? mergeTagsFor(reminder) : BEEFREE_MERGE_TAGS}
                   onSaved={handleDesignSaved}
                   onApi={(api) => (designerApi.current = api)}
                   onError={(err) => {

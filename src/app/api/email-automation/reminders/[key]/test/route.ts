@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getNocodeToken } from "@/lib/auth";
 import { nocodeDb } from "@/lib/nocode/db";
 import { requireCreator } from "@/lib/email-automation";
-import { contentFromTestBody, sendReminderTest } from "@/lib/email-test";
-import { REMINDERS, isReminderKey } from "@/lib/workshop-reminder-schedule";
+import { contentFromTestBody, sendKindTest } from "@/lib/email-test";
+import { isEmailKind } from "@/lib/email-notifications";
 
 type Ctx = { params: Promise<{ key: string }> };
 
@@ -12,7 +12,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   const creator = await requireCreator();
   if ("error" in creator) return NextResponse.json({ error: creator.error }, { status: creator.status });
   const { key } = await params;
-  if (!isReminderKey(key)) return NextResponse.json({ error: "Unknown reminder" }, { status: 404 });
+  if (!isEmailKind(key)) return NextResponse.json({ error: "Unknown email" }, { status: 404 });
 
   const token = await getNocodeToken();
   const rows = await nocodeDb.creatorReminderTemplates.findMany({ where: { creator_id: creator.user.id, reminder: key } }, token);
@@ -21,12 +21,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   if (!creator.user.email) return NextResponse.json({ error: "Your account has no email address" }, { status: 400 });
 
   try {
-    await sendReminderTest({
-      user: creator.user,
-      token,
-      content,
-      startsIn: REMINDERS.find((r) => r.key === key)!.phrase,
-    });
+    await sendKindTest({ user: creator.user, token, content, kind: key });
     return NextResponse.json({ message: `Test email sent to ${creator.user.email}` });
   } catch (error) {
     console.error("[reminder-template test]", error);

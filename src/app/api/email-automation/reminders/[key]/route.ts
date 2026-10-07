@@ -3,9 +3,9 @@ import { getNocodeToken } from "@/lib/auth";
 import { nocodeDb } from "@/lib/nocode/db";
 import { requireCreator, templateFieldsFromBody, templateForEditor } from "@/lib/email-automation";
 import { contentFromRow } from "@/lib/email-template-render";
-import { isReminderKey } from "@/lib/workshop-reminder-schedule";
+import { isEmailKind } from "@/lib/email-notifications";
 import { getBranding } from "@/lib/branding";
-import { defaultReminderEmail } from "@/lib/workshop-reminder-default";
+import { defaultEmailFor } from "@/lib/notification-default";
 
 type Ctx = { params: Promise<{ key: string }> };
 
@@ -13,7 +13,7 @@ async function load(params: Ctx["params"]) {
   const creator = await requireCreator();
   if ("error" in creator) return { error: creator.error, status: creator.status } as const;
   const { key } = await params;
-  if (!isReminderKey(key)) return { error: "Unknown reminder", status: 404 } as const;
+  if (!isEmailKind(key)) return { error: "Unknown email", status: 404 } as const;
   const token = await getNocodeToken();
   const rows = await nocodeDb.creatorReminderTemplates.findMany(
     { where: { creator_id: creator.user.id, reminder: key } },
@@ -31,7 +31,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
   if (!row) {
     // Nothing saved: open on the email learners get today, with this creator's logo and colour.
     const branding = await getBranding(user.id, token);
-    const fallback = defaultReminderEmail(key, {
+    const fallback = defaultEmailFor(key, {
       logoUrl: branding.emailLogoUrl || branding.logoUrl || undefined,
       color: branding.themeColor || undefined,
     });

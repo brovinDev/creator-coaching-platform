@@ -1,16 +1,11 @@
 import { nocodeDb } from "@/lib/nocode/db";
-import { getBranding } from "@/lib/branding";
 import { sendEmail } from "@/lib/email";
-import { defaultReminderEmail } from "@/lib/workshop-reminder-default";
+import { loadEmailTemplate } from "@/lib/notification-emails";
+import type { EmailKind } from "@/lib/email-notifications";
 import { idList } from "@/lib/feed";
-import { occurrences } from "@/lib/workshop-time";
-import {
-  buildReminderPlaceholderValues,
-  contentFromRow,
-  renderEmailTemplate,
-  type EmailTemplateContent,
-} from "@/lib/email-template-render";
-import { dueReminders, type ReminderKind } from "@/lib/workshop-reminder-schedule";
+import { occurrences, type Occurrence } from "@/lib/workshop-time";
+import { buildReminderPlaceholderValues, renderEmailTemplate } from "@/lib/email-template-render";
+import { dueReminders, postWorkshopDue } from "@/lib/workshop-reminder-schedule";
 import { hostNameFor, scheduleOf } from "@/lib/workshops";
 
 type Row = Record<string, unknown>;
@@ -19,6 +14,8 @@ const SYSTEM_TOKEN = process.env.NOCODE_SYSTEM_TOKEN || "";
 /** Sessions further away than this cannot have a reminder due yet. */
 const LOOKAHEAD_MS = 25 * 3600_000;
 const BATCH = 5;
+/** A session that ended longer ago than this can no longer be due for the post workshop email. */
+const AFTER_LOOKBACK_MS = 30 * 60_000;
 
 export interface ReminderRunResult {
   skipped?: "already-running";
@@ -73,30 +70,24 @@ export function formatSessionParts(startMs: number, timezone: string) {
   return { date, time, when: `${date}, ${time}` };
 }
 
-async function sendReminder(workshop: Row, startMs: number, reminder: ReminderKind): Promise<{ sent: number; failed: number }> {
+/** One email that is due for a session: a reminder before it, or the thank-you after it. */
+interface DueEmail {
+  key: EmailKind;
+  /** "in 24 hours"; empty for the post workshop email. */
+  phrase: string;
+  setting: string;
+}
+
+async function sendWorkshopEmail(workshop: Row, startMs: number, due: DueEmail): Promise<{ sent: number; failed: number }> {
   const creatorId = String(workshop.creator_id);
   const schedule = scheduleOf(workshop);
-  const [branding, host, settings, recipients, custom] = await Promise.all([
-    getBranding(creatorId, SYSTEM_TOKEN),
+  const [host, settings, recipients, template] = await Promise.all([
     hostNameFor(creatorId, SYSTEM_TOKEN),
     nocodeDb.creatorEmailSettings.findUnique({ creator_id: creatorId }, SYSTEM_TOKEN).catch(() => null),
     recipientsFor(workshop),
-    nocodeDb.creatorReminderTemplates
-      .findMany({ where: { creator_id: creatorId, reminder: reminder.key } }, SYSTEM_TOKEN)
-      .catch(() => [] as Row[]),
+    // The creator's own wording if they wrote one (and it is on and complete), otherwise the default.
+    loadEmailTemplate(creatorId, due.key),
   ]);
-  // The creator's own wording, if they wrote one and have not switched it off. Otherwise the built-in email.
-  const customRow = custom.find((row) => row.enabled !== false) ?? null;
-  const builtIn = defaultReminderEmail(reminder.key, {
-    logoUrl: branding.emailLogoUrl || branding.logoUrl || undefined,
-    color: branding.themeColor || undefined,
-  });
-  const template: EmailTemplateContent = contentFromRow(customRow, "") ?? {
-    subject: builtIn.subject,
-    format: "html",
-    html: builtIn.html,
-    body_text: builtIn.text,
-  };
   const fromName = String(settings?.from_name || "") || undefined;
   const replyTo = String(settings?.reply_to || "") || undefined;
   const { date, time } = formatSessionParts(startMs, schedule.timezone);
@@ -107,7 +98,7 @@ async function sendReminder(workshop: Row, startMs: number, reminder: ReminderKi
     const results = await Promise.allSettled(
       recipients.slice(i, i + BATCH).map((recipient) => {
         // The meeting link only goes out once the join window is open.
-        const joinUrl = reminder.key === "5m" ? String(workshop.meeting_url || "") : undefined;
+        const joinUrl = due.key === "5m" ? String(workshop.meeting_url || "") : undefined;
         const email = renderEmailTemplate(
           template,
           buildReminderPlaceholderValues({
@@ -117,7 +108,7 @@ async function sendReminder(workshop: Row, startMs: number, reminder: ReminderKi
             hostName: host,
             date,
             time,
-            startsIn: reminder.phrase,
+            startsIn: due.phrase,
             link: joinUrl || `${process.env.NEXT_PUBLIC_APP_URL}/student/workshops`,
           })
         );
@@ -135,8 +126,17 @@ async function sendReminder(workshop: Row, startMs: number, reminder: ReminderKi
   return { sent, failed };
 }
 
+/** What is due for one session right now. */
+function dueFor(occurrence: Occurrence, now: number): DueEmail[] {
+  const due: DueEmail[] = dueReminders(occurrence.startMs, now).map((r) => ({ key: r.key, phrase: r.phrase, setting: r.setting }));
+  if (postWorkshopDue(occurrence.endMs, now)) {
+    due.push({ key: "after15m", phrase: "", setting: "notify_after15m_enabled" });
+  }
+  return due;
+}
+
 /**
- * Sends every workshop reminder that is due right now. Called once a minute (by the backend
+ * Sends every workshop email that is due right now: the 24 hour, 1 hour and 5 minute reminders and the post workshop email. Called once a minute (by the backend
  * scheduler through /api/cron/reminders). Safe to call more often: each (workshop, session,
  * reminder) is claimed in `workshop_reminders` before anything is sent, so it goes out at
  * most once. A crash half way through a batch therefore loses the rest rather than emailing
@@ -157,9 +157,11 @@ export async function runWorkshopReminders(now = Date.now()): Promise<ReminderRu
       if (!schedule.start_date || !schedule.start_time) continue;
 
       for (const occurrence of occurrences(schedule)) {
-        if (occurrence.startMs <= now || occurrence.startMs - now > LOOKAHEAD_MS) continue;
+        const upcoming = occurrence.startMs > now && occurrence.startMs - now <= LOOKAHEAD_MS;
+        const justEnded = occurrence.endMs <= now && now - occurrence.endMs <= AFTER_LOOKBACK_MS;
+        if (!upcoming && !justEnded) continue;
 
-        for (const reminder of dueReminders(occurrence.startMs, now)) {
+        for (const due of dueFor(occurrence, now)) {
           if (!settingsByCreator.has(creatorId)) {
             settingsByCreator.set(
               creatorId,
@@ -167,15 +169,15 @@ export async function runWorkshopReminders(now = Date.now()): Promise<ReminderRu
             );
           }
           // Unset means on; the creator has to switch it off.
-          if (settingsByCreator.get(creatorId)?.[reminder.setting] === false) continue;
+          if (settingsByCreator.get(creatorId)?.[due.setting] === false) continue;
 
           const key = {
             workshop_id: String(workshop.id),
             session_start: new Date(occurrence.startMs).toISOString(),
-            reminder: reminder.key,
+            reminder: due.key,
           };
           // Not filtered on session_start: the backend never matches an ISO time string in a
-          // filter, so a lookup on it would always miss and the reminder would be sent twice.
+          // filter, so a lookup on it would always miss and the email would be sent twice.
           const previous = await nocodeDb.workshopReminders.findMany(
             { where: { workshop_id: key.workshop_id, reminder: key.reminder } },
             SYSTEM_TOKEN
@@ -185,7 +187,7 @@ export async function runWorkshopReminders(now = Date.now()): Promise<ReminderRu
           const claim = await nocodeDb.workshopReminders.create({ ...key, sent_count: "0", failed_count: "0" }, SYSTEM_TOKEN);
           result.due++;
           try {
-            const { sent, failed } = await sendReminder(workshop, occurrence.startMs, reminder);
+            const { sent, failed } = await sendWorkshopEmail(workshop, occurrence.startMs, due);
             result.sent += sent;
             result.failed += failed;
             await nocodeDb.workshopReminders.update(
@@ -194,7 +196,7 @@ export async function runWorkshopReminders(now = Date.now()): Promise<ReminderRu
               SYSTEM_TOKEN
             );
           } catch (error) {
-            console.error(`[workshop-reminders] ${reminder.key} for workshop ${workshop.id} failed:`, error);
+            console.error(`[workshop-reminders] ${due.key} for workshop ${workshop.id} failed:`, error);
           }
         }
       }

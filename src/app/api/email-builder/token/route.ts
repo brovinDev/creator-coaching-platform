@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth, getNocodeToken } from "@/lib/auth";
 import { nocodeDb } from "@/lib/nocode/db";
+import { isEmailKind } from "@/lib/email-notifications";
 
 // Beefree credentials must stay server-side, so the browser asks us for a token.
 // The token's uid must match the uid the builder is started with, so it is returned too.
@@ -14,8 +15,8 @@ export async function POST(req: NextRequest) {
   const { serviceId, reminder } = await req.json().catch(() => ({}));
   let uid = session.user.id;
   if (reminder) {
-    if (!["24h", "1h", "5m"].includes(String(reminder))) {
-      return NextResponse.json({ error: "Unknown reminder" }, { status: 404 });
+    if (!isEmailKind(String(reminder))) {
+      return NextResponse.json({ error: "Unknown email" }, { status: 404 });
     }
     uid = `${session.user.id}-reminder-${reminder}`;
   }
