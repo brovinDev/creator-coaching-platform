@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { StudentNav } from "@/components/student/nav";
+import { TopNav } from "@/components/layout/top-nav";
 
 export default async function StudentLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -11,8 +11,8 @@ export default async function StudentLayout({ children }: { children: React.Reac
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <StudentNav user={session.user} />
-      <main className="max-w-6xl mx-auto px-4 py-6">{children}</main>
+      <TopNav role="STUDENT" user={session.user} />
+      <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
     </div>
   );
 }

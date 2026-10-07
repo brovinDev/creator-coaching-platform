@@ -1,6 +1,8 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { CreatorSidebar } from "@/components/creator/sidebar";
+import { TopNav } from "@/components/layout/top-nav";
+import { CreatorShell } from "@/components/creator/creator-shell";
+import { getBranding } from "@/lib/branding";
 
 export default async function CreatorLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -13,12 +15,12 @@ export default async function CreatorLayout({ children }: { children: React.Reac
     redirect("/student");
   }
 
+  const branding = await getBranding(session.user.id);
+
   return (
-    <div className="flex h-screen bg-gray-50">
-      <CreatorSidebar user={session.user} />
-      <main className="flex-1 overflow-y-auto">
-        <div className="p-6 lg:p-8">{children}</div>
-      </main>
+    <div className="min-h-screen bg-gray-50">
+      <TopNav role="CREATOR" user={session.user} logoUrl={branding.logoUrl} brandName={branding.brandName} />
+      <CreatorShell>{children}</CreatorShell>
     </div>
   );
 }
