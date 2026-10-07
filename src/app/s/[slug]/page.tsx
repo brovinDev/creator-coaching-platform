@@ -2,9 +2,33 @@ import { nocodeDb } from "@/lib/nocode/db";
 import { notFound } from "next/navigation";
 import { formatPrice } from "@/lib/utils";
 import Link from "next/link";
+import type { Metadata } from "next";
+import { getBranding } from "@/lib/branding";
+import { buttonStyle } from "@/lib/branding-colors";
 
 const SYSTEM_TOKEN = process.env.NOCODE_SYSTEM_TOKEN || "";
 const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME || "Open Slate";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const service = await nocodeDb.services.findUnique({ slug }, SYSTEM_TOKEN).catch(() => null);
+  if (!service) return {};
+
+  const branding = await getBranding(String(service.creator_id));
+  const title = branding.previewTitle || String(service.title || "") || branding.brandName;
+  const description = branding.previewDescription || String(service.description || "").slice(0, 150);
+  const image = branding.previewImageUrl || String(service.cover_image || "");
+  return {
+    title,
+    description,
+    openGraph: { title, description, ...(image ? { images: [image] } : {}) },
+    ...(branding.faviconUrl ? { icons: { icon: branding.faviconUrl } } : {}),
+  };
+}
 
 export default async function ServicePreviewPage({
   params,
@@ -20,11 +44,12 @@ export default async function ServicePreviewPage({
     .findUnique({ user_id: String(service.creator_id) }, SYSTEM_TOKEN)
     .catch(() => null);
 
+  const branding = await getBranding(String(service.creator_id));
   const firstName = String(creatorProfile?.first_name || "");
   const lastName = String(creatorProfile?.last_name || "");
-  const creatorName = `${firstName} ${lastName}`.trim() || "Creator";
+  const creatorName = branding.brandName || `${firstName} ${lastName}`.trim() || "Creator";
 
-  const logoUrl = (creatorProfile?.avatar as string) || null;
+  const logoUrl = branding.logoUrl || (creatorProfile?.avatar as string) || null;
   const logoInitials = creatorName
     .split(" ")
     .map((w: string) => w[0])
@@ -124,7 +149,8 @@ export default async function ServicePreviewPage({
           </div>
           <Link
             href={checkoutUrl}
-            className="bg-gray-900 text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-gray-800 transition-colors"
+            style={buttonStyle(branding.themeColor)}
+            className="px-6 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
           >
             {isFree ? "Register" : "Buy Now"}
           </Link>
@@ -136,8 +162,16 @@ export default async function ServicePreviewPage({
         <div className="max-w-lg mx-auto w-full flex items-center justify-between text-xs text-gray-400">
           <span>{APP_NAME} {new Date().getFullYear()}.</span>
           <div className="flex gap-4">
-            <span>Privacy</span>
-            <span>Terms</span>
+            {branding.privacyUrl ? (
+              <a href={branding.privacyUrl} target="_blank" rel="noopener noreferrer" className="hover:text-gray-600">Privacy</a>
+            ) : (
+              <span>Privacy</span>
+            )}
+            {branding.termsUrl ? (
+              <a href={branding.termsUrl} target="_blank" rel="noopener noreferrer" className="hover:text-gray-600">Terms</a>
+            ) : (
+              <span>Terms</span>
+            )}
           </div>
         </div>
       </div>

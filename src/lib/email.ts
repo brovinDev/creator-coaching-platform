@@ -1,3 +1,4 @@
+import { readableTextColor } from "@/lib/branding-colors";
 import nodemailer from "nodemailer";
 
 const transporter = nodemailer.createTransport({
@@ -155,6 +156,9 @@ export interface ServiceRegistrationEmailInput {
   transactionId?: string;
   /** ISO date; only mentioned when it is in the future. */
   startDate?: string | null;
+  /** Creator branding: image shown above the heading, and the button colour (#rrggbb). */
+  logoUrl?: string;
+  buttonColor?: string;
 }
 
 /**
@@ -196,12 +200,13 @@ export function serviceRegistrationEmail(input: ServiceRegistrationEmailInput) {
     subject: paid ? `Payment confirmed - ${input.serviceName}` : `You're registered for ${input.serviceName}`,
     html: `
       <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+        ${input.logoUrl ? `<img src="${escapeHtml(input.logoUrl)}" alt="" style="max-height: 56px; max-width: 200px; margin-bottom: 16px;" />` : ""}
         <h1 style="color: #1a1a1a;">${paid ? "Payment confirmed!" : "You're in!"}</h1>
         <p>Hi ${name}, you're now registered for <strong>${service}</strong>.</p>
         ${receipt}
         ${startsLater ? `<p>This service starts on <strong>${startsLater}</strong>.</p>` : ""}
         <p>Sign in to ${appName} to access everything included in your registration.</p>
-        <a href="${appUrl}/student" style="display: inline-block; padding: 12px 24px; background: #6366f1; color: white; text-decoration: none; border-radius: 6px;">Go to my dashboard</a>
+        <a href="${appUrl}/student" style="display: inline-block; padding: 12px 24px; background: ${escapeHtml(input.buttonColor || "#6366f1")}; color: ${escapeHtml(readableTextColor(input.buttonColor || "#6366f1"))}; text-decoration: none; border-radius: 6px;">Go to my dashboard</a>
       </div>
     `,
   };

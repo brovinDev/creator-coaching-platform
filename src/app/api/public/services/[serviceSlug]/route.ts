@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { nocodeDb } from "@/lib/nocode/db";
+import { getBranding } from "@/lib/branding";
 
 const SYSTEM_TOKEN = process.env.NOCODE_SYSTEM_TOKEN || "";
 
@@ -26,7 +27,8 @@ export async function GET(
       ? `${creatorProfile.first_name || ""} ${creatorProfile.last_name || ""}`.trim() || "Creator"
       : "Creator";
 
-  const logoUrl = creatorProfile?.avatar || null;
+  const branding = await getBranding(String(service.creator_id));
+  const logoUrl = branding.logoUrl || creatorProfile?.avatar || null;
 
   return NextResponse.json({
     id: service.id,
@@ -43,8 +45,13 @@ export async function GET(
     payment_config: service.payment_config,
     success_config: service.success_config,
     creator: {
-      name: creatorName,
+      name: branding.brandName || creatorName,
       logo: logoUrl,
+    },
+    branding: {
+      themeColor: branding.themeColor,
+      termsUrl: branding.termsUrl,
+      privacyUrl: branding.privacyUrl,
     },
   });
 }

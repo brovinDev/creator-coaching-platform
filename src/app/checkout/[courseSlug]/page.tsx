@@ -10,6 +10,7 @@ import {
   ArrowLeft, Plus, Mail, CheckCircle, LogIn, X,
 } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
+import { buttonStyle } from "@/lib/branding-colors";
 import toast from "react-hot-toast";
 
 const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME || "Open Slate";
@@ -36,6 +37,7 @@ interface ServiceData {
   serviceType: string;
   slug: string;
   creator: { name: string; logo: string | null };
+  branding?: { themeColor: string; termsUrl: string; privacyUrl: string };
   customFields: CustomField[];
 }
 
@@ -106,6 +108,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
         enableGst: !!s.enable_gst, serviceType: s.service_type || "one-time",
         slug: s.slug || "",
         creator: s.creator || { name: "Creator", logo: null },
+        branding: s.branding,
         customFields,
       });
       setLoading(false);
@@ -567,10 +570,23 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
                   onClick={handlePayment}
                   disabled={submitting || authStep !== "done"}
                   className="w-full mt-5 py-3.5 bg-gray-400 hover:bg-gray-500 disabled:bg-gray-300 text-white rounded-lg text-sm font-semibold transition-colors cursor-pointer disabled:cursor-not-allowed"
-                  style={authStep === "done" ? { backgroundColor: "#374151" } : {}}
+                  style={authStep === "done" ? buttonStyle(service.branding?.themeColor || "#374151") : {}}
                 >
                   {submitting ? "Processing..." : isFree ? "Register" : `Proceed to pay ${formatPrice(totalAmount)}`}
                 </button>
+
+                {(service.branding?.termsUrl || service.branding?.privacyUrl) && (
+                  <p className="mt-3 text-center text-xs text-gray-400">
+                    By continuing you agree to the{" "}
+                    {service.branding?.termsUrl && (
+                      <a href={service.branding.termsUrl} target="_blank" rel="noopener noreferrer" className="underline">Terms</a>
+                    )}
+                    {service.branding?.termsUrl && service.branding?.privacyUrl && " and "}
+                    {service.branding?.privacyUrl && (
+                      <a href={service.branding.privacyUrl} target="_blank" rel="noopener noreferrer" className="underline">Privacy Policy</a>
+                    )}
+                  </p>
+                )}
 
                 {/* Payment method icons */}
                 {!isFree && (

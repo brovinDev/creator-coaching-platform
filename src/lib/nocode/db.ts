@@ -28,6 +28,7 @@ export const MODULES = {
   coupons: "coupons",
   service_email_templates: "service_email_templates",
   creator_email_settings: "creator_email_settings",
+  creator_branding: "creator_branding",
 } as const;
 
 type Row = Record<string, unknown>;
@@ -145,4 +146,5 @@ export const nocodeDb = {
   coupons: new NocodeModel(MODULES.coupons),
   serviceEmailTemplates: new NocodeModel(MODULES.service_email_templates),
   creatorEmailSettings: new NocodeModel(MODULES.creator_email_settings),
+  creatorBranding: new NocodeModel(MODULES.creator_branding),
 };

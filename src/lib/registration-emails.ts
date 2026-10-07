@@ -5,6 +5,7 @@ import {
   serviceRegistrationEmail,
   serviceSaleNotificationEmail,
 } from "@/lib/email";
+import { getBranding } from "@/lib/branding";
 import {
   buildPlaceholderValues,
   contentFromRow,
@@ -124,6 +125,7 @@ export async function sendRegistrationEmails(
       template ??= contentFromRow(settings, "default_");
       if (template) content = renderEmailTemplate(template, values);
 
+      const branding = content || !creatorId ? null : await getBranding(creatorId);
       content ??= serviceRegistrationEmail({
         name: learnerName,
         serviceName: name,
@@ -131,6 +133,8 @@ export async function sendRegistrationEmails(
         currency,
         transactionId: input.transactionId,
         startDate,
+        logoUrl: branding?.emailLogoUrl || branding?.logoUrl || undefined,
+        buttonColor: branding?.themeColor || undefined,
       });
       sends.push(
         sendEmail({ to: learnerEmail, fromName, replyTo, ...content }).then(() => {
