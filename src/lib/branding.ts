@@ -1,5 +1,5 @@
 import { nocodeDb } from "@/lib/nocode/db";
-import { isValidHexColor } from "@/lib/branding-colors";
+import { DEFAULT_PRODUCT_NAME, MAX_PRODUCT_NAME, isValidHexColor } from "@/lib/branding-colors";
 import { learnerAccess } from "@/lib/feed";
 
 const SYSTEM_TOKEN = process.env.NOCODE_SYSTEM_TOKEN || "";
@@ -8,6 +8,9 @@ export interface Branding {
   brandName: string;
   logoUrl: string;
   emailLogoUrl: string;
+  invoiceLogoUrl: string;
+  /** What the creator calls what they sell; "service" unless they changed it. */
+  productName: string;
   faviconUrl: string;
   themeColor: string;
   previewTitle: string;
@@ -26,6 +29,8 @@ export function brandingFromRow(row: Record<string, unknown> | null | undefined)
     brandName: text(row?.brand_name),
     logoUrl: text(row?.logo_url),
     emailLogoUrl: text(row?.email_logo_url),
+    invoiceLogoUrl: text(row?.invoice_logo_url),
+    productName: text(row?.product_name).trim() || DEFAULT_PRODUCT_NAME,
     faviconUrl: text(row?.favicon_url),
     themeColor: isValidHexColor(color) ? color : "",
     previewTitle: text(row?.preview_title),
@@ -42,7 +47,7 @@ export async function getBranding(creatorId: string, token = SYSTEM_TOKEN): Prom
   return brandingFromRow(row);
 }
 
-const URL_FIELDS = ["logo_url", "email_logo_url", "favicon_url", "preview_image_url", "terms_url", "privacy_url"] as const;
+const URL_FIELDS = ["logo_url", "email_logo_url", "invoice_logo_url", "favicon_url", "preview_image_url", "terms_url", "privacy_url"] as const;
 
 /** Only http(s) links are kept: these end up in `href`/`src` on public pages and in emails. */
 export function isSafeUrl(value: string) {
@@ -61,6 +66,7 @@ export function brandingFieldsFromBody(body: Record<string, unknown>): Record<st
     brand_name: 100,
     preview_title: 100,
     preview_description: 150,
+    product_name: MAX_PRODUCT_NAME,
   };
   for (const [key, max] of Object.entries(limits)) {
     if (typeof body[key] === "string") data[key] = (body[key] as string).trim().slice(0, max);

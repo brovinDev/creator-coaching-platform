@@ -5,6 +5,7 @@ import toast from "react-hot-toast";
 import { Loader2, Trash2, Upload, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TIMEZONES, weekdayOf } from "@/lib/workshop-time";
+import { useProductName } from "@/components/product-name";
 
 interface ServiceOption {
   id: string;
@@ -146,6 +147,7 @@ export function WorkshopDrawer({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const product = useProductName();
   const [form, setForm] = useState<Form>(emptyForm);
   const [loading, setLoading] = useState(workshopId !== null);
   const [saving, setSaving] = useState(false);
@@ -485,26 +487,26 @@ export function WorkshopDrawer({
               )}
             </div>
 
-            <Field label="Link services" hint="Learners who own any of these services can attend.">
+            <Field label={`Link ${product.many}`} hint={`Learners who own any of these ${product.many} can attend.`}>
               <ServiceChecklist
                 services={services}
                 selected={form.serviceIds}
                 disabledIds={[]}
                 onChange={(ids) => setForm((f) => ({ ...f, serviceIds: ids, excludeServiceIds: f.excludeServiceIds.filter((id) => !ids.includes(id)) }))}
-                empty="Create a service first, then link it here."
+                empty={`Create a ${product.one} first, then link it here.`}
               />
             </Field>
 
             <Field
-              label="Exclude common customers from other services (optional)"
-              hint="Customers of these services are left out even if they also own a linked service."
+              label={`Exclude common customers from other ${product.many} (optional)`}
+              hint={`Customers of these ${product.many} are left out even if they also own a linked ${product.one}.`}
             >
               <ServiceChecklist
                 services={services}
                 selected={form.excludeServiceIds}
                 disabledIds={form.serviceIds}
                 onChange={(ids) => set("excludeServiceIds", ids)}
-                empty="You have no services yet."
+                empty={`You have no ${product.many} yet.`}
               />
             </Field>
 

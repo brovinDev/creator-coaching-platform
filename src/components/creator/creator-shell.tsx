@@ -19,6 +19,7 @@ import {
   Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useProductName } from "@/components/product-name";
 
 type Icon = React.ComponentType<{ className?: string }>;
 
@@ -69,6 +70,7 @@ const linkClass = (active: boolean) =>
 
 function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
+  const product = useProductName();
   const [openGroup, setOpenGroup] = useState<string | null>(null);
 
   return (
@@ -78,7 +80,7 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
         return (
           <Link key={item.href} href={item.href} onClick={onNavigate} className={linkClass(active)}>
             <item.icon className="h-5 w-5" />
-            {item.label}
+            {item.href === "/creator/services" ? product.Many : item.label}
           </Link>
         );
       })}

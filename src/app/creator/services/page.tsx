@@ -20,6 +20,7 @@ import {
   Link2,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import { useProductName } from "@/components/product-name";
 
 interface Service {
   id: string;
@@ -159,6 +160,7 @@ function ActionsMenu({
 }
 
 export default function ServicesPage() {
+  const product = useProductName();
   const router = useRouter();
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
@@ -175,21 +177,21 @@ export default function ServicesPage() {
       const data = await res.json();
       setServices(data);
     } catch {
-      toast.error("Failed to load services");
+      toast.error(`Failed to load ${product.many}`);
     } finally {
       setLoading(false);
     }
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Are you sure you want to delete this service?")) return;
+    if (!confirm(`Are you sure you want to delete this ${product.one}?`)) return;
     try {
       const res = await fetch(`/api/services/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error();
-      toast.success("Service deleted");
+      toast.success(`${product.One} deleted`);
       setServices((prev) => prev.filter((s) => s.id !== id));
     } catch {
-      toast.error("Failed to delete service");
+      toast.error(`Failed to delete ${product.one}`);
     }
   }
 
@@ -213,10 +215,10 @@ export default function ServicesPage() {
         }),
       });
       if (!cloneRes.ok) throw new Error();
-      toast.success("Service cloned!");
+      toast.success(`${product.One} cloned!`);
       fetchServices();
     } catch {
-      toast.error("Failed to clone service");
+      toast.error(`Failed to clone ${product.one}`);
     }
   }
 
@@ -235,14 +237,14 @@ export default function ServicesPage() {
         )
       );
     } catch {
-      toast.error("Failed to update service");
+      toast.error(`Failed to update ${product.one}`);
     }
   }
 
   function handleShare(service: Service) {
     const url = `${window.location.origin}/checkout/${service.slug}`;
     navigator.clipboard.writeText(url);
-    toast.success("Service link copied!");
+    toast.success(`${product.One} link copied!`);
   }
 
   const filtered = services.filter((s) =>
@@ -260,12 +262,12 @@ export default function ServicesPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Services</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{product.Many}</h1>
         <div className="flex items-center gap-3">
           <Link href="/creator/services/new">
             <Button>
               <Plus className="h-4 w-4" />
-              Create new service
+              Create new {product.one}
             </Button>
           </Link>
           <Button variant="outline" onClick={fetchServices}>
@@ -278,9 +280,9 @@ export default function ServicesPage() {
       {services.length === 0 ? (
         <EmptyState
           icon={Briefcase}
-          title="No services yet"
-          description="Create your first service to start selling courses and workshops."
-          actionLabel="Create new service"
+          title={`No ${product.many} yet`}
+          description={`Create your first ${product.one} to start selling courses and workshops.`}
+          actionLabel={`Create new ${product.one}`}
           onAction={() => router.push("/creator/services/new")}
         />
       ) : (
@@ -289,7 +291,7 @@ export default function ServicesPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <input
               type="text"
-              placeholder="Search by service title"
+              placeholder={`Search by ${product.one} title`}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full rounded-lg border border-gray-300 pl-10 pr-4 py-2.5 text-sm placeholder:text-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
@@ -408,7 +410,7 @@ export default function ServicesPage() {
                       colSpan={6}
                       className="px-6 py-12 text-center text-sm text-gray-400"
                     >
-                      No services match your search.
+                      No {product.many} match your search.
                     </td>
                   </tr>
                 )}

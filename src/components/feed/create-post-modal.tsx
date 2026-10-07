@@ -5,6 +5,7 @@ import toast from "react-hot-toast";
 import { ArrowLeft, Clock, ImageIcon, Loader2, Search, X } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { cn } from "@/lib/utils";
+import { useProductName } from "@/components/product-name";
 
 interface ServiceOption {
   id: string;
@@ -44,6 +45,7 @@ function ServicePicker({
   disabledIds: string[];
   onChange: (ids: string[]) => void;
 }) {
+  const product = useProductName();
   const [query, setQuery] = useState("");
   const shown = services.filter((s) => s.title.toLowerCase().includes(query.trim().toLowerCase()));
   const selectable = shown.filter((s) => !disabledIds.includes(s.id));
@@ -62,7 +64,7 @@ function ServicePicker({
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search service by name"
+          placeholder={`Search ${product.one} by name`}
           className="w-full rounded-lg border border-gray-300 py-2.5 pl-9 pr-3 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
         />
       </div>
@@ -81,7 +83,7 @@ function ServicePicker({
         Select all
       </label>
       <div className="space-y-2">
-        {shown.length === 0 && <p className="py-4 text-center text-sm text-gray-400">No services found</p>}
+        {shown.length === 0 && <p className="py-4 text-center text-sm text-gray-400">No {product.many} found</p>}
         {shown.map((s) => {
           const disabled = disabledIds.includes(s.id);
           return (
@@ -123,6 +125,7 @@ export function CreatePostModal({
   userName: string;
   userImage?: string | null;
 }) {
+  const product = useProductName();
   const [step, setStep] = useState<Step>("compose");
   const [content, setContent] = useState("");
   const [imageUrl, setImageUrl] = useState("");
@@ -228,8 +231,8 @@ export function CreatePostModal({
           </button>
           {step === "include" ? (
             <ServicePicker
-              title="Select services"
-              help="Only learners with access to these services will see this post. Leave empty to show it to all your learners."
+              title={`Select ${product.many}`}
+              help={`Only learners with access to these ${product.many} will see this post. Leave empty to show it to all your learners.`}
               services={services}
               selected={include}
               disabledIds={exclude}
@@ -237,8 +240,8 @@ export function CreatePostModal({
             />
           ) : (
             <ServicePicker
-              title="Select exclude services"
-              help="Learners who have access to these services will not be able to see this post."
+              title={`Select exclude ${product.many}`}
+              help={`Learners who have access to these ${product.many} will not be able to see this post.`}
               services={services}
               selected={exclude}
               disabledIds={include}
@@ -268,14 +271,14 @@ export function CreatePostModal({
                   onClick={() => setStep("include")}
                   className="cursor-pointer rounded-md bg-gray-100 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-200"
                 >
-                  {include.length > 0 ? `${include.length} service${include.length > 1 ? "s" : ""}` : "+ service"}
+                  {include.length > 0 ? `${include.length} ${include.length > 1 ? product.many : product.one}` : `+ ${product.one}`}
                 </button>
                 <button
                   type="button"
                   onClick={() => setStep("exclude")}
                   className="cursor-pointer rounded-md bg-gray-100 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-200"
                 >
-                  {exclude.length > 0 ? `${exclude.length} excluded` : "+ exclude service"}
+                  {exclude.length > 0 ? `${exclude.length} excluded` : `+ exclude ${product.one}`}
                 </button>
               </div>
               {(include.length > 0 || exclude.length > 0) && (
