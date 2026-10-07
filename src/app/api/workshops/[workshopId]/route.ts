@@ -36,6 +36,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ worksho
     recurrenceEnd: s.recurrence_end,
     serviceIds: idList(w.service_ids),
     excludeServiceIds: idList(w.exclude_service_ids),
+    upsellServiceId: String(w.upsell_service_id || ""),
   });
 }
 

@@ -51,6 +51,7 @@ export interface WorkshopInput {
   recurrence_end: string;
   service_ids: string[];
   exclude_service_ids: string[];
+  upsell_service_id: string;
 }
 
 /** Checks a request body. Returns the cleaned workshop or an error message. */
@@ -109,6 +110,8 @@ export function parseWorkshopBody(
   const serviceIds = pick(body.serviceIds);
   if (serviceIds.length === 0) return "Link at least one service";
   const excludeIds = pick(body.excludeServiceIds).filter((id) => !serviceIds.includes(id));
+  // Any of the creator's own services can be promoted, linked or not.
+  const upsell = typeof body.upsellServiceId === "string" && ownServiceIds.has(body.upsellServiceId) ? body.upsellServiceId : "";
 
   return {
     title,
@@ -125,6 +128,7 @@ export function parseWorkshopBody(
     recurrence_end: recurrenceEnd,
     service_ids: serviceIds,
     exclude_service_ids: excludeIds,
+    upsell_service_id: upsell,
   };
 }
 
