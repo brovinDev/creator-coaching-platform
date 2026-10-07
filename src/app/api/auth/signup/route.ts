@@ -7,7 +7,7 @@ const SYSTEM_TOKEN = process.env.NOCODE_SYSTEM_TOKEN || "";
 
 export async function POST(req: NextRequest) {
   try {
-    const { name, email, password, role } = await req.json();
+    const { name, email, password } = await req.json();
 
     if (!name || !email || !password) {
       return NextResponse.json({ error: "All fields are required" }, { status: 400 });
@@ -33,7 +33,8 @@ export async function POST(req: NextRequest) {
     try {
       const signin = await nocodeSignin(email, password);
       const userId = signin.data.id;
-      const userRole = role === "CREATOR" ? "CREATOR" : "STUDENT";
+      // Public signup is for creators only; students register from a service's checkout page.
+      const userRole = "CREATOR";
 
       await nocodeDb.userProfiles.create(
         { user_id: userId, role: userRole },
