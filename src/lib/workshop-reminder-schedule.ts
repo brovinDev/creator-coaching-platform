@@ -15,6 +15,8 @@ export interface ReminderKind {
   label: string;
 }
 
+export type ReminderKey = ReminderKind["key"];
+
 export const REMINDERS: ReminderKind[] = [
   { key: "24h", beforeMs: 24 * HOUR, phrase: "in 24 hours", setting: "reminder_24h_enabled", label: "Reminder Email 24 hours before Workshop" },
   { key: "1h", beforeMs: HOUR, phrase: "in 1 hour", setting: "reminder_1h_enabled", label: "Reminder Email 1 hour before Workshop" },
@@ -37,3 +39,16 @@ export function dueReminders(startMs: number, now: number): ReminderKind[] {
     return now >= opens && now < opens + Math.min(r.beforeMs, MAX_LATE_MS);
   });
 }
+
+export const isReminderKey = (value: string): value is ReminderKey => REMINDERS.some((r) => r.key === value);
+
+/** What the editor starts from when a creator has not written their own yet. */
+export const REMINDER_STARTER_SUBJECT = "Reminder: {workshop.title} starts {workshop.starts_in}";
+export const REMINDER_STARTER_BODY = `Hi {contact.firstname},
+
+{workshop.title} with {workshop.host} starts {workshop.starts_in}.
+
+When: {workshop.date}, {workshop.time}
+Join: {workshop.link}
+
+See you there!`;

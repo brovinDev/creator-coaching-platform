@@ -1,8 +1,15 @@
 import { nocodeDb } from "@/lib/nocode/db";
 import { getBranding } from "@/lib/branding";
-import { sendEmail, workshopReminderEmail } from "@/lib/email";
+import { sendEmail } from "@/lib/email";
+import { defaultReminderEmail } from "@/lib/workshop-reminder-default";
 import { idList } from "@/lib/feed";
 import { occurrences } from "@/lib/workshop-time";
+import {
+  buildReminderPlaceholderValues,
+  contentFromRow,
+  renderEmailTemplate,
+  type EmailTemplateContent,
+} from "@/lib/email-template-render";
 import { dueReminders, type ReminderKind } from "@/lib/workshop-reminder-schedule";
 import { hostNameFor, scheduleOf } from "@/lib/workshops";
 
@@ -59,47 +66,61 @@ async function recipientsFor(workshop: Row) {
   return found;
 }
 
-function formatWhen(startMs: number, timezone: string) {
-  return new Intl.DateTimeFormat("en-IN", {
-    timeZone: timezone,
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    hour: "numeric",
-    minute: "2-digit",
-    timeZoneName: "short",
-  }).format(new Date(startMs));
+export function formatSessionParts(startMs: number, timezone: string) {
+  const at = new Date(startMs);
+  const date = new Intl.DateTimeFormat("en-IN", { timeZone: timezone, weekday: "short", day: "numeric", month: "short" }).format(at);
+  const time = new Intl.DateTimeFormat("en-IN", { timeZone: timezone, hour: "numeric", minute: "2-digit", timeZoneName: "short" }).format(at);
+  return { date, time, when: `${date}, ${time}` };
 }
 
 async function sendReminder(workshop: Row, startMs: number, reminder: ReminderKind): Promise<{ sent: number; failed: number }> {
   const creatorId = String(workshop.creator_id);
   const schedule = scheduleOf(workshop);
-  const [branding, host, settings, recipients] = await Promise.all([
+  const [branding, host, settings, recipients, custom] = await Promise.all([
     getBranding(creatorId, SYSTEM_TOKEN),
     hostNameFor(creatorId, SYSTEM_TOKEN),
     nocodeDb.creatorEmailSettings.findUnique({ creator_id: creatorId }, SYSTEM_TOKEN).catch(() => null),
     recipientsFor(workshop),
+    nocodeDb.creatorReminderTemplates
+      .findMany({ where: { creator_id: creatorId, reminder: reminder.key } }, SYSTEM_TOKEN)
+      .catch(() => [] as Row[]),
   ]);
+  // The creator's own wording, if they wrote one and have not switched it off. Otherwise the built-in email.
+  const customRow = custom.find((row) => row.enabled !== false) ?? null;
+  const builtIn = defaultReminderEmail(reminder.key, {
+    logoUrl: branding.emailLogoUrl || branding.logoUrl || undefined,
+    color: branding.themeColor || undefined,
+  });
+  const template: EmailTemplateContent = contentFromRow(customRow, "") ?? {
+    subject: builtIn.subject,
+    format: "html",
+    html: builtIn.html,
+    body_text: builtIn.text,
+  };
   const fromName = String(settings?.from_name || "") || undefined;
   const replyTo = String(settings?.reply_to || "") || undefined;
-  const when = formatWhen(startMs, schedule.timezone);
+  const { date, time } = formatSessionParts(startMs, schedule.timezone);
 
   let sent = 0;
   let failed = 0;
   for (let i = 0; i < recipients.length; i += BATCH) {
     const results = await Promise.allSettled(
       recipients.slice(i, i + BATCH).map((recipient) => {
-        const email = workshopReminderEmail({
-          name: recipient.name,
-          workshopTitle: String(workshop.title || "your workshop"),
-          hostName: host,
-          phrase: reminder.phrase,
-          when,
-          // The meeting link only goes out once the join window is open.
-          joinUrl: reminder.key === "5m" ? String(workshop.meeting_url || "") : undefined,
-          logoUrl: branding.emailLogoUrl || branding.logoUrl || undefined,
-          buttonColor: branding.themeColor || undefined,
-        });
+        // The meeting link only goes out once the join window is open.
+        const joinUrl = reminder.key === "5m" ? String(workshop.meeting_url || "") : undefined;
+        const email = renderEmailTemplate(
+          template,
+          buildReminderPlaceholderValues({
+            learnerName: recipient.name,
+            learnerEmail: recipient.email,
+            workshopTitle: String(workshop.title || "your workshop"),
+            hostName: host,
+            date,
+            time,
+            startsIn: reminder.phrase,
+            link: joinUrl || `${process.env.NEXT_PUBLIC_APP_URL}/student/workshops`,
+          })
+        );
         return sendEmail({ to: recipient.email, ...email, fromName, replyTo });
       })
     );

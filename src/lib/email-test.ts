@@ -2,6 +2,7 @@ import { nocodeDb } from "@/lib/nocode/db";
 import { sendEmail, formatAmount } from "@/lib/email";
 import {
   buildPlaceholderValues,
+  buildReminderPlaceholderValues,
   renderEmailTemplate,
   type EmailTemplateContent,
 } from "@/lib/email-template-render";
@@ -30,6 +31,35 @@ export async function sendTemplateTest(opts: {
   });
   const rendered = renderEmailTemplate(content, values);
 
+  await sendEmail({
+    to: user.email,
+    ...rendered,
+    subject: `[Test] ${rendered.subject}`,
+    fromName: String(settings?.from_name || "") || undefined,
+    replyTo: String(settings?.reply_to || "") || undefined,
+  });
+}
+
+/** The same, for a workshop reminder: sample workshop details, sent to the creator only. */
+export async function sendReminderTest(opts: {
+  user: { id: string; name: string; email: string };
+  token: string;
+  content: EmailTemplateContent;
+  startsIn: string;
+}) {
+  const { user, token, content, startsIn } = opts;
+  const settings = await nocodeDb.creatorEmailSettings.findUnique({ creator_id: user.id }, token).catch(() => null);
+  const values = buildReminderPlaceholderValues({
+    learnerName: user.name || "",
+    learnerEmail: user.email,
+    workshopTitle: "Your workshop",
+    hostName: user.name || "Your name",
+    date: "Thu, 8 Oct",
+    time: "7:00 pm IST",
+    startsIn,
+    link: `${process.env.NEXT_PUBLIC_APP_URL}/student/workshops`,
+  });
+  const rendered = renderEmailTemplate(content, values);
   await sendEmail({
     to: user.email,
     ...rendered,

@@ -136,7 +136,9 @@ Learners of a workshop's linked services get a reminder **24 hours**, **1 hour**
 - **Backend setup:** set `OPEN_SLATE_WEB_URL` (this app's public URL) and `OPEN_SLATE_CRON_SECRET` (same value as `CRON_SECRET` here) in the backend's `.env`, then restart it once. Without both, nothing is scheduled.
 - **At most once:** each (workshop, session, reminder) is recorded in the `workshop_reminders` module before sending, so restarts and retries never email learners twice. If the backend is down, a reminder is skipped once it is more than 10 minutes late rather than sent at the wrong time.
 - **Content:** built-in emails using the creator's email logo and theme colour. The 24 hour and 1 hour emails link to the learner's Workshops page; the 5 minute email carries the meeting link. Times are shown in the workshop's timezone.
-- **Needs an email address:** learners only get reminders if their profile has an email, which is saved when they sign in. Custom reminder designs are not built yet.
+- **One default, two uses:** `src/lib/workshop-reminder-default.ts` generates the built-in reminder (with the creator's logo and theme colour) and the same email as a Beefree design. Learners get it until a creator saves their own, and the editor opens on exactly that design, so editing starts from what is really sent.
+- **Custom wording:** each reminder row in Email Automation has an edit button (same plain-text and visual editor as the confirmation email, saved per creator in `creator_reminder_templates`). Placeholders: `{contact.firstname}`, `{contact.lastname}`, `{contact.fullname}`, `{contact.email}`, `{workshop.title}`, `{workshop.host}`, `{workshop.date}`, `{workshop.time}`, `{workshop.starts_in}`, `{workshop.link}`, `{link.dashboard}`. `{workshop.link}` is the meeting link in the 5 minute reminder and the learner's Workshops page in the others. A custom email that is switched off, or has no subject or body, falls back to the built-in one. Reset removes it.
+- **Needs an email address:** learners only get reminders if their profile has an email, which is saved when they sign in.
 
 ## Payment flow
 

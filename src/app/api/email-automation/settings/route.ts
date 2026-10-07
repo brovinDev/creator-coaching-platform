@@ -3,6 +3,7 @@ import { getNocodeToken } from "@/lib/auth";
 import { nocodeDb } from "@/lib/nocode/db";
 import { isValidEmail, requireCreator } from "@/lib/email-automation";
 import { REMINDERS } from "@/lib/workshop-reminder-schedule";
+import { contentFromRow } from "@/lib/email-template-render";
 
 export async function GET() {
   const creator = await requireCreator();
@@ -10,7 +11,18 @@ export async function GET() {
 
   const token = await getNocodeToken();
   const row = await nocodeDb.creatorEmailSettings.findUnique({ creator_id: creator.user.id }, token);
+  // Which reminders have the creator's own wording in use (written, and not switched off).
+  const templates = await nocodeDb.creatorReminderTemplates
+    .findMany({ where: { creator_id: creator.user.id } }, token)
+    .catch(() => []);
+  const custom = Object.fromEntries(
+    REMINDERS.map((r) => [
+      r.key,
+      templates.some((t) => t.reminder === r.key && t.enabled !== false && !!contentFromRow(t, "")),
+    ])
+  );
   return NextResponse.json({
+    reminder_custom: custom,
     from_name: String(row?.from_name || ""),
     reply_to: String(row?.reply_to || ""),
     // Unset means on.

@@ -11,9 +11,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { serviceId } = await req.json().catch(() => ({}));
+  const { serviceId, reminder } = await req.json().catch(() => ({}));
   let uid = session.user.id;
-  if (serviceId) {
+  if (reminder) {
+    if (!["24h", "1h", "5m"].includes(String(reminder))) {
+      return NextResponse.json({ error: "Unknown reminder" }, { status: 404 });
+    }
+    uid = `${session.user.id}-reminder-${reminder}`;
+  }
+  if (serviceId && !reminder) {
     const service = await nocodeDb.services.findUnique({ id: String(serviceId) }, await getNocodeToken());
     if (!service || service.creator_id !== session.user.id) {
       return NextResponse.json({ error: "Service not found" }, { status: 404 });

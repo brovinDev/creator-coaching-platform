@@ -17,6 +17,21 @@ export const EMAIL_PLACEHOLDERS = [
   { key: "link.dashboard", label: "Dashboard link" },
 ] as const;
 
+/** What a workshop reminder can use. Shown in the reminder editor instead of the purchase placeholders. */
+export const REMINDER_PLACEHOLDERS = [
+  { key: "contact.firstname", label: "Learner first name" },
+  { key: "contact.lastname", label: "Learner last name" },
+  { key: "contact.fullname", label: "Learner full name" },
+  { key: "contact.email", label: "Learner email" },
+  { key: "workshop.title", label: "Workshop title" },
+  { key: "workshop.host", label: "Host name" },
+  { key: "workshop.date", label: "Session date" },
+  { key: "workshop.time", label: "Session start time" },
+  { key: "workshop.starts_in", label: "How soon it starts (in 1 hour)" },
+  { key: "workshop.link", label: "Join link (or your workshops page before the join window)" },
+  { key: "link.dashboard", label: "Dashboard link" },
+] as const;
+
 export type PlaceholderKey = (typeof EMAIL_PLACEHOLDERS)[number]["key"];
 export type PlaceholderValues = Record<PlaceholderKey, string>;
 
@@ -34,10 +49,11 @@ const LEGACY_ALIASES: Record<string, PlaceholderKey> = {
 };
 
 /** Shape Beefree expects for its `mergeTags` config. */
-export const BEEFREE_MERGE_TAGS = EMAIL_PLACEHOLDERS.map((p) => ({
-  name: p.label,
-  value: placeholderToken(p.key),
-}));
+export const toBeefreeMergeTags = (list: readonly { key: string; label: string }[]) =>
+  list.map((p) => ({ name: p.label, value: placeholderToken(p.key) }));
+
+export const BEEFREE_MERGE_TAGS = toBeefreeMergeTags(EMAIL_PLACEHOLDERS);
+export const REMINDER_MERGE_TAGS = toBeefreeMergeTags(REMINDER_PLACEHOLDERS);
 
 export function escapeHtml(value: string) {
   return value

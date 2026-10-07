@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { cn } from "@/lib/utils";
-import { REMINDERS } from "@/lib/workshop-reminder-schedule";
+import { REMINDERS, type ReminderKey } from "@/lib/workshop-reminder-schedule";
 
 interface ServiceRow {
   id: string;
@@ -135,6 +135,8 @@ export default function EmailAutomationPage() {
   const [expanded, setExpanded] = useState(true);
   const [hasDefault, setHasDefault] = useState(false);
   const [resetFor, setResetFor] = useState<ServiceRow | null>(null);
+  const [customReminders, setCustomReminders] = useState<Record<ReminderKey, boolean>>({ "24h": false, "1h": false, "5m": false });
+  const [resetReminder, setResetReminder] = useState<ReminderKey | null>(null);
   const [resetting, setResetting] = useState(false);
   const [importFor, setImportFor] = useState<ServiceRow | null>(null);
   const [importFrom, setImportFrom] = useState("");
@@ -155,6 +157,9 @@ export default function EmailAutomationPage() {
         if (!settingsRes.ok) throw new Error("Could not load email settings");
         const s: Settings = await settingsRes.json();
         setSettings(s);
+        if ((s as Settings & { reminder_custom?: Record<ReminderKey, boolean> }).reminder_custom) {
+          setCustomReminders((s as Settings & { reminder_custom: Record<ReminderKey, boolean> }).reminder_custom);
+        }
         setSaved({ from_name: s.from_name, reply_to: s.reply_to });
         await loadServices();
       } catch (err) {
@@ -213,6 +218,20 @@ export default function EmailAutomationPage() {
     if (!res.ok) {
       setSettings((s) => ({ ...s, [setting]: previous }));
       toast.error("Failed to update the reminder");
+    }
+  }
+
+  async function confirmResetReminder() {
+    if (!resetReminder) return;
+    try {
+      const res = await fetch(`/api/email-automation/reminders/${resetReminder}`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
+      setCustomReminders((c) => ({ ...c, [resetReminder]: false }));
+      toast.success("Reset to the built-in reminder");
+    } catch {
+      toast.error("Failed to reset the reminder");
+    } finally {
+      setResetReminder(null);
     }
   }
 
@@ -446,6 +465,14 @@ export default function EmailAutomationPage() {
                   <p className="text-sm text-gray-500">
                     Sent to learners of the linked services {reminder.phrase.replace("in ", "")} before each session.
                   </p>
+                  <span
+                    className={cn(
+                      "mt-2 inline-block rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase text-white",
+                      customReminders[reminder.key] ? "bg-pink-600" : "bg-gray-500"
+                    )}
+                  >
+                    {customReminders[reminder.key] ? "Custom template is being used" : "Default template is being used"}
+                  </span>
                 </div>
                 <div className="flex w-32 justify-center">
                   <Toggle
@@ -454,7 +481,18 @@ export default function EmailAutomationPage() {
                     label={reminder.label}
                   />
                 </div>
-                <div className="w-24" />
+                <div className="flex w-24 items-center justify-end gap-2">
+                  <IconButton label={`Edit ${reminder.label}`} onClick={() => router.push(`/creator/automation/email/reminder/${reminder.key}`)}>
+                    <Pencil className="h-4 w-4" />
+                  </IconButton>
+                  <IconButton
+                    label={customReminders[reminder.key] ? "Reset to the built-in reminder" : "No custom email to reset"}
+                    disabled={!customReminders[reminder.key]}
+                    onClick={() => setResetReminder(reminder.key)}
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                  </IconButton>
+                </div>
               </div>
             ))}
 
@@ -522,6 +560,21 @@ export default function EmailAutomationPage() {
         <div className="mt-5 flex justify-end">
           <Button onClick={runImport} loading={importing} disabled={!importFrom}>
             Import Template to service
+          </Button>
+        </div>
+      </Modal>
+
+      <Modal open={!!resetReminder} onClose={() => setResetReminder(null)} title="Reset reminder email">
+        <p className="text-sm text-gray-600">
+          Reset <strong>{REMINDERS.find((r) => r.key === resetReminder)?.label}</strong>? Your version will be deleted and the
+          built-in reminder will be sent instead.
+        </p>
+        <div className="mt-5 flex justify-end gap-3">
+          <Button variant="outline" onClick={() => setResetReminder(null)}>
+            Cancel
+          </Button>
+          <Button variant="danger" onClick={confirmResetReminder}>
+            Reset
           </Button>
         </div>
       </Modal>
