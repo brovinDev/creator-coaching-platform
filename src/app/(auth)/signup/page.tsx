@@ -17,7 +17,6 @@ export default function SignupPage() {
     name: "",
     email: "",
     password: "",
-    role: "STUDENT" as "STUDENT" | "CREATOR",
   });
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [resendTimer, setResendTimer] = useState(0);
@@ -224,34 +223,6 @@ export default function SignupPage() {
             required
             minLength={6}
           />
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">I am a</label>
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => setForm({ ...form, role: "STUDENT" })}
-                className={`flex-1 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
-                  form.role === "STUDENT"
-                    ? "border-indigo-600 bg-indigo-50 text-indigo-700"
-                    : "border-gray-300 text-gray-600 hover:bg-gray-50"
-                }`}
-              >
-                Student
-              </button>
-              <button
-                type="button"
-                onClick={() => setForm({ ...form, role: "CREATOR" })}
-                className={`flex-1 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
-                  form.role === "CREATOR"
-                    ? "border-indigo-600 bg-indigo-50 text-indigo-700"
-                    : "border-gray-300 text-gray-600 hover:bg-gray-50"
-                }`}
-              >
-                Creator
-              </button>
-            </div>
-          </div>
 
           <Button type="submit" className="w-full" loading={loading}>
             Continue

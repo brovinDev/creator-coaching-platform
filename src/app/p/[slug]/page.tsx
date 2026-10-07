@@ -1,42 +1,49 @@
-import { db } from "@/lib/db";
+import { nocodeDb } from "@/lib/nocode/db";
 import { notFound } from "next/navigation";
 import { formatPrice } from "@/lib/utils";
 import Link from "next/link";
 import { MetaPixel } from "@/components/meta-pixel";
 import { CheckCircle } from "lucide-react";
 
+const SYSTEM_TOKEN = process.env.NOCODE_SYSTEM_TOKEN || "";
+
 export default async function PublicLandingPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
 
-  const page = await db.landingPage.findUnique({
-    where: { slug },
-    include: {
-      course: {
-        include: { creator: { select: { name: true, bio: true, avatar: true } } },
-      },
-      sections: { orderBy: { position: "asc" } },
-    },
-  });
-
+  const page = await nocodeDb.landingPages.findUnique({ slug }, SYSTEM_TOKEN);
   if (!page || !page.published) notFound();
 
-  const checkoutUrl = `/checkout/${page.course.slug}`;
+  const course = await nocodeDb.courses.findUnique({ id: String(page.course_id) }, SYSTEM_TOKEN);
+  if (!course) notFound();
+
+  const creatorProfile = await nocodeDb.userProfiles
+    .findUnique({ user_id: String(course.creator_id) }, SYSTEM_TOKEN)
+    .catch(() => null);
+
+  const sections = await nocodeDb.landingPageSections.findMany(
+    { where: { landing_page_id: String(page.id) }, orderBy: { position: "asc" } },
+    SYSTEM_TOKEN
+  );
+
+  const checkoutUrl = `/checkout/${course.slug}`;
+  const coursePrice = Number(course.price) || 0;
 
   return (
     <>
-      {page.metaPixelId && <MetaPixel pixelId={page.metaPixelId} />}
+      {page.meta_pixel_id && <MetaPixel pixelId={page.meta_pixel_id as string} />}
 
       <div className="min-h-screen bg-white">
-        {page.sections
+        {sections
           .filter((s) => s.visible)
           .map((section) => {
-            const c = section.content as Record<string, unknown>;
+            const raw = section.content;
+            const c = (typeof raw === "string" ? JSON.parse(raw) : raw) as Record<string, unknown>;
 
             switch (section.type) {
               case "hero":
                 return (
                   <section
-                    key={section.id}
+                    key={String(section.id)}
                     className="relative bg-gradient-to-br from-indigo-600 to-purple-700 text-white py-20 px-4"
                     style={
                       (c.backgroundImage as string)
@@ -59,7 +66,7 @@ export default async function PublicLandingPage({ params }: { params: Promise<{ 
 
               case "course-info":
                 return (
-                  <section key={section.id} className="py-16 px-4">
+                  <section key={String(section.id)} className="py-16 px-4">
                     <div className="max-w-4xl mx-auto">
                       <h2 className="text-3xl font-bold text-gray-900 text-center mb-6">{c.title as string}</h2>
                       <p className="text-lg text-gray-600 text-center max-w-2xl mx-auto mb-8">{c.description as string}</p>
@@ -79,7 +86,7 @@ export default async function PublicLandingPage({ params }: { params: Promise<{ 
 
               case "what-you-learn":
                 return (
-                  <section key={section.id} className="py-16 px-4 bg-gray-50">
+                  <section key={String(section.id)} className="py-16 px-4 bg-gray-50">
                     <div className="max-w-4xl mx-auto">
                       <h2 className="text-3xl font-bold text-gray-900 text-center mb-8">{c.title as string}</h2>
                       <div className="grid sm:grid-cols-2 gap-4 max-w-2xl mx-auto">
@@ -96,7 +103,7 @@ export default async function PublicLandingPage({ params }: { params: Promise<{ 
 
               case "instructor":
                 return (
-                  <section key={section.id} className="py-16 px-4">
+                  <section key={String(section.id)} className="py-16 px-4">
                     <div className="max-w-4xl mx-auto text-center">
                       <h2 className="text-3xl font-bold text-gray-900 mb-8">Meet Your Instructor</h2>
                       <div className="flex flex-col items-center">
@@ -112,12 +119,12 @@ export default async function PublicLandingPage({ params }: { params: Promise<{ 
 
               case "pricing":
                 return (
-                  <section key={section.id} className="py-16 px-4 bg-gray-50">
+                  <section key={String(section.id)} className="py-16 px-4 bg-gray-50">
                     <div className="max-w-lg mx-auto text-center">
                       <h2 className="text-3xl font-bold text-gray-900 mb-8">{c.title as string}</h2>
                       <div className="bg-white rounded-2xl shadow-lg p-8 hover:shadow-xl transition-all">
                         <p className="text-4xl font-bold text-gray-900 mb-2">
-                          {page.course.price > 0 ? formatPrice(page.course.price) : "Free"}
+                          {coursePrice > 0 ? formatPrice(coursePrice) : "Free"}
                         </p>
                         <p className="text-gray-500 mb-6">One-time payment</p>
                         {(c.features as string[])?.length > 0 && (
@@ -143,7 +150,7 @@ export default async function PublicLandingPage({ params }: { params: Promise<{ 
 
               case "faq":
                 return (
-                  <section key={section.id} className="py-16 px-4">
+                  <section key={String(section.id)} className="py-16 px-4">
                     <div className="max-w-3xl mx-auto">
                       <h2 className="text-3xl font-bold text-gray-900 text-center mb-8">{c.title as string}</h2>
                       <div className="space-y-4">
@@ -160,7 +167,7 @@ export default async function PublicLandingPage({ params }: { params: Promise<{ 
 
               case "cta":
                 return (
-                  <section key={section.id} className="py-16 px-4 bg-indigo-600 text-white">
+                  <section key={String(section.id)} className="py-16 px-4 bg-indigo-600 text-white">
                     <div className="max-w-4xl mx-auto text-center">
                       <h2 className="text-3xl font-bold mb-4">{c.heading as string}</h2>
                       <p className="text-xl text-white/80 mb-8">{c.subheading as string}</p>
@@ -180,7 +187,7 @@ export default async function PublicLandingPage({ params }: { params: Promise<{ 
           })}
 
         <footer className="py-8 px-4 text-center text-sm text-gray-400">
-          Powered by {process.env.NEXT_PUBLIC_APP_NAME || "Upskill"}
+          Powered by {process.env.NEXT_PUBLIC_APP_NAME || "Open Slate"}
         </footer>
       </div>
     </>

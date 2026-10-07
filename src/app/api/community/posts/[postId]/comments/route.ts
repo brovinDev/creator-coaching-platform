@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { auth, getNocodeToken } from "@/lib/auth";
+import { nocodeDb } from "@/lib/nocode/db";
 import { sendEmail, communityReplyEmail } from "@/lib/email";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ postId: string }> }) {
@@ -8,21 +8,54 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ post
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const comments = await db.communityComment.findMany({
-    where: { postId, parentId: null },
-    include: {
-      author: { select: { id: true, name: true, avatar: true, role: true } },
-      replies: {
-        include: {
-          author: { select: { id: true, name: true, avatar: true, role: true } },
-        },
-        orderBy: { createdAt: "asc" },
-      },
-    },
-    orderBy: { createdAt: "asc" },
-  });
+  const token = await getNocodeToken();
 
-  return NextResponse.json(comments);
+  const comments = await nocodeDb.communityComments.findMany(
+    { where: { post_id: postId, parent_id: null }, orderBy: { created_at: "asc" } },
+    token
+  );
+
+  const commentsWithAuthor = await Promise.all(
+    comments.map(async (comment) => {
+      const profile = await nocodeDb.userProfiles.findUnique(
+        { user_id: String(comment.user_id) },
+        token
+      ).catch(() => null);
+
+      const replies = await nocodeDb.communityComments.findMany(
+        { where: { parent_id: String(comment.id) }, orderBy: { created_at: "asc" } },
+        token
+      );
+
+      const repliesWithAuthor = await Promise.all(
+        replies.map(async (reply) => {
+          const replyProfile = await nocodeDb.userProfiles.findUnique(
+            { user_id: String(reply.user_id) },
+            token
+          ).catch(() => null);
+
+          return {
+            ...reply,
+            authorId: reply.user_id,
+            author: replyProfile
+              ? { id: replyProfile.user_id, name: replyProfile.name || "", avatar: replyProfile.avatar || null, role: replyProfile.role || "STUDENT" }
+              : { id: reply.user_id, name: "User", avatar: null, role: "STUDENT" },
+          };
+        })
+      );
+
+      return {
+        ...comment,
+        authorId: comment.user_id,
+        author: profile
+          ? { id: profile.user_id, name: profile.name || "", avatar: profile.avatar || null, role: profile.role || "STUDENT" }
+          : { id: comment.user_id, name: "User", avatar: null, role: "STUDENT" },
+        replies: repliesWithAuthor,
+      };
+    })
+  );
+
+  return NextResponse.json(commentsWithAuthor);
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ postId: string }> }) {
@@ -30,34 +63,41 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pos
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const token = await getNocodeToken();
   const { content, parentId } = await req.json();
   if (!content?.trim()) return NextResponse.json({ error: "Content is required" }, { status: 400 });
 
-  const comment = await db.communityComment.create({
-    data: {
+  const comment = await nocodeDb.communityComments.create(
+    {
       content,
-      authorId: session.user.id,
-      postId,
-      parentId: parentId || null,
+      user_id: session.user.id,
+      post_id: postId,
+      parent_id: parentId || null,
     },
-    include: {
-      author: { select: { id: true, name: true, avatar: true, role: true } },
-    },
-  });
+    token
+  );
 
-  const post = await db.communityPost.findUnique({
-    where: { id: postId },
-    include: { author: true },
-  });
+  const post = await nocodeDb.communityPosts.findUnique({ id: postId }, token);
 
-  if (post && post.authorId !== session.user.id) {
-    const emailContent = communityReplyEmail(
-      post.author.name,
-      post.title || "your post",
-      `${process.env.NEXT_PUBLIC_APP_URL}/student/community`
-    );
-    sendEmail({ to: post.author.email, ...emailContent });
+  if (post && String(post.user_id) !== session.user.id) {
+    const authorProfile = await nocodeDb.userProfiles.findUnique(
+      { user_id: String(post.user_id) },
+      token
+    ).catch(() => null);
+
+    if (authorProfile?.email) {
+      const emailContent = communityReplyEmail(
+        (authorProfile.name as string) || "User",
+        (post.title as string) || "your post",
+        `${process.env.NEXT_PUBLIC_APP_URL}/student/community`
+      );
+      sendEmail({ to: authorProfile.email as string, ...emailContent });
+    }
   }
 
-  return NextResponse.json(comment);
+  return NextResponse.json({
+    ...comment,
+    authorId: session.user.id,
+    author: { id: session.user.id, name: session.user.name, avatar: null, role: session.user.role },
+  });
 }

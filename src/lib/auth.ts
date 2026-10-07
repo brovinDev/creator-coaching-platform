@@ -1,7 +1,8 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
-import bcrypt from "bcryptjs";
-import { db } from "./db";
+import { nocodeSignin } from "./nocode/client";
+import { nocodeDb } from "./nocode/db";
+import { syncProfileContact } from "./profile-contact";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
@@ -14,27 +15,35 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
 
-        const user = await db.user.findUnique({
-          where: { email: credentials.email as string },
-        });
+        try {
+          const res = await nocodeSignin(
+            credentials.email as string,
+            credentials.password as string
+          );
 
-        if (!user) return null;
+          if (!res.success || !res.data) return null;
 
-        if (!user.emailVerified) return null;
+          const user = res.data;
+          const name = [user.first_name, user.last_name].filter(Boolean).join(" ");
 
-        const passwordMatch = await bcrypt.compare(
-          credentials.password as string,
-          user.passwordHash
-        );
+          const systemToken = process.env.NOCODE_SYSTEM_TOKEN || "";
+          const profile = await nocodeDb.userProfiles
+            .findUnique({ user_id: user.id }, systemToken)
+            .catch(() => null);
 
-        if (!passwordMatch) return null;
+          await syncProfileContact(profile, user);
 
-        return {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-        };
+          return {
+            id: user.id,
+            name,
+            email: user.email,
+            image: (profile?.avatar as string) || null,
+            role: (profile?.role as string) || "STUDENT",
+            nocodeToken: user.jwt,
+          };
+        } catch {
+          return null;
+        }
       },
     }),
   ],
@@ -43,6 +52,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (user) {
         token.id = user.id;
         token.role = (user as { role: string }).role;
+        token.nocodeToken = (user as { nocodeToken: string }).nocodeToken;
       }
       return token;
     },
@@ -50,6 +60,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (session.user) {
         session.user.id = token.id as string;
         session.user.role = token.role as string;
+        (session as { nocodeToken?: string }).nocodeToken = token.nocodeToken as string;
       }
       return session;
     },
@@ -61,3 +72,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     strategy: "jwt",
   },
 });
+
+export async function getNocodeToken(): Promise<string> {
+  return process.env.NOCODE_SYSTEM_TOKEN || "";
+}

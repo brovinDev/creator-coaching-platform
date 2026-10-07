@@ -1,32 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
-import { db } from "@/lib/db";
+import { nocodeResetPassword } from "@/lib/nocode/client";
 
 export async function POST(req: NextRequest) {
   try {
-    const { token, password } = await req.json();
+    const { token, password, email } = await req.json();
 
     if (!token || !password) {
       return NextResponse.json({ error: "Token and password are required" }, { status: 400 });
     }
 
-    const resetRecord = await db.passwordReset.findUnique({ where: { token } });
-
-    if (!resetRecord || resetRecord.used || resetRecord.expiresAt < new Date()) {
-      return NextResponse.json({ error: "Invalid or expired reset token" }, { status: 400 });
+    try {
+      await nocodeResetPassword(email || "", password, token);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Invalid or expired reset token";
+      return NextResponse.json({ error: msg }, { status: 400 });
     }
-
-    const passwordHash = await bcrypt.hash(password, 12);
-
-    await db.user.update({
-      where: { id: resetRecord.userId },
-      data: { passwordHash },
-    });
-
-    await db.passwordReset.update({
-      where: { id: resetRecord.id },
-      data: { used: true },
-    });
 
     return NextResponse.json({ message: "Password reset successfully" });
   } catch (error) {

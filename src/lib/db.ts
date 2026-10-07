@@ -1,13 +1,5 @@
-import { PrismaClient } from "@/generated/prisma/client";
-import { PrismaPg } from "@prisma/adapter-pg";
+// Legacy Prisma client — now replaced by nocode backend.
+// Import from "@/lib/nocode/db" instead.
+// This file is kept to avoid breaking imports during migration.
 
-const globalForPrisma = globalThis as unknown as { prisma: InstanceType<typeof PrismaClient> };
-
-function createPrismaClient() {
-  const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
-  return new PrismaClient({ adapter });
-}
-
-export const db = globalForPrisma.prisma || createPrismaClient();
-
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = db;
+export { nocodeDb as db } from "./nocode/db";
