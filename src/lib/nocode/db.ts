@@ -32,6 +32,7 @@ export const MODULES = {
   feed_posts: "feed_posts",
   feed_likes: "feed_likes",
   feed_replies: "feed_replies",
+  workshops: "workshops",
 } as const;
 
 type Row = Record<string, unknown>;
@@ -153,4 +154,5 @@ export const nocodeDb = {
   feedPosts: new NocodeModel(MODULES.feed_posts),
   feedLikes: new NocodeModel(MODULES.feed_likes),
   feedComments: new NocodeModel(MODULES.feed_replies),
+  workshops: new NocodeModel(MODULES.workshops),
 };

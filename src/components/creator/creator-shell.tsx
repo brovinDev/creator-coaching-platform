@@ -14,6 +14,7 @@ import {
   Settings,
   Ticket,
   Users,
+  Video,
   X,
   Zap,
 } from "lucide-react";
@@ -37,6 +38,7 @@ interface Group {
 const ITEMS: Item[] = [
   { label: "Overview", href: "/creator", icon: LayoutDashboard, exact: true },
   { label: "Services", href: "/creator/services", icon: Briefcase },
+  { label: "Workshops", href: "/creator/workshops", icon: Video },
   { label: "Landing Pages", href: "/creator/landing-pages", icon: FileText },
   { label: "Community", href: "/creator/community", icon: MessageSquare },
   { label: "Coupons", href: "/creator/coupons", icon: Ticket },
@@ -50,14 +52,14 @@ const GROUPS: Group[] = [
     label: "Settings",
     icon: Settings,
     items: [
+      { label: "Platform Settings", href: "/creator/settings/branding" },
       { label: "Profile", href: "/creator/settings" },
-      { label: "Branding", href: "/creator/settings/branding" },
     ],
   },
 ];
 
 /** These top tabs have their own layout, so the dashboard sidebar is not shown. */
-const NO_SIDEBAR = ["/creator/feed", "/creator/courses", "/creator/workshops"];
+const NO_SIDEBAR = ["/creator/feed", "/creator/courses"];
 
 const linkClass = (active: boolean) =>
   cn(

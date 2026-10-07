@@ -29,13 +29,13 @@ interface Tab {
 const CREATOR_TABS: Tab[] = [
   { label: "Dashboard", href: "/creator", icon: Layers, exact: true },
   { label: "Feed", href: "/creator/feed", icon: Compass },
-  { label: "Workshops", href: "/creator/workshops", icon: Video, soon: true },
+  { label: "Workshops", href: "/creator/workshops", icon: Video },
   { label: "Courses", href: "/creator/courses", icon: BookOpen },
 ];
 
 const STUDENT_TABS: Tab[] = [
   { label: "Feed", href: "/student/feed", icon: Compass },
-  { label: "Workshops", href: "/student/workshops", icon: Video, soon: true },
+  { label: "Workshops", href: "/student/workshops", icon: Video },
   { label: "Courses", href: "/student", icon: BookOpen, exact: true },
 ];
 
@@ -134,7 +134,7 @@ export function TopNav({ role, user, logoUrl, brandName }: TopNavProps) {
                 key={tab.href}
                 href={tab.href}
                 aria-current={active ? "page" : undefined}
-                className={cn(base, "transition-colors", active ? "border-gray-900 text-gray-900" : "border-transparent text-gray-500 hover:text-gray-900")}
+                className={cn(base, "transition-colors", active ? "border-indigo-600 text-indigo-700" : "border-transparent text-gray-500 hover:text-gray-900")}
               >
                 {inner}
               </Link>

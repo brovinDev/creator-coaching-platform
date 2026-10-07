@@ -1,11 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { Clock, Heart, Loader2, MessageCircle, PenSquare, Plus, Trash2, Video } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { CreatePostModal } from "./create-post-modal";
+import { type SessionItem } from "@/components/workshops/workshop-list";
 
 interface Post {
   id: string;
@@ -124,7 +126,7 @@ function Comments({ post, onCount }: { post: Post; onCount: (n: number) => void 
           type="button"
           onClick={send}
           disabled={!text.trim() || sending}
-          className="cursor-pointer rounded-full bg-gray-900 px-4 text-sm font-semibold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+          className="cursor-pointer rounded-full bg-indigo-600 px-4 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-gray-300"
         >
           Post
         </button>
@@ -256,7 +258,7 @@ function CreateMenu({ onPost }: { onPost: () => void }) {
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-gray-900 py-3 text-sm font-semibold text-white hover:bg-gray-700"
+        className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-indigo-600 py-3 text-sm font-semibold text-white hover:bg-indigo-700"
       >
         <Plus className="h-4 w-4" /> Create
       </button>
@@ -276,17 +278,190 @@ function CreateMenu({ onPost }: { onPost: () => void }) {
               <span className="block text-xs text-gray-500">Put up content on your services</span>
             </span>
           </button>
-          <div aria-disabled="true" className="flex cursor-not-allowed items-center gap-3 px-4 py-3 opacity-60">
+          <Link
+            href="/creator/workshops?new=1"
+            className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-gray-50"
+          >
             <Video className="h-7 w-7 shrink-0 text-blue-500" />
             <span>
-              <span className="block text-sm font-semibold text-gray-900">
-                Workshop <span className="ml-1 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-gray-500">Soon</span>
-              </span>
+              <span className="block text-sm font-semibold text-gray-900">Workshop</span>
               <span className="block text-xs text-gray-500">Setup workshops for your audience</span>
             </span>
-          </div>
+          </Link>
         </div>
       )}
+    </div>
+  );
+}
+
+const JOIN_LEAD_MS = 15 * 60 * 1000;
+
+const clock = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+
+function countdown(ms: number) {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const part = (n: number) => String(n).padStart(2, "0");
+  return `${part(Math.floor(total / 3600))}h ${part(Math.floor((total % 3600) / 60))}m ${part(total % 60)}s`;
+}
+
+const sameDay = (a: Date, b: Date) =>
+  a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+
+function TodayCard({ session, now, isCreator }: { session: SessionItem; now: number; isCreator: boolean }) {
+  const start = Date.parse(session.startAt);
+  const end = Date.parse(session.endAt);
+  const live = now >= start;
+  const label = isCreator ? "Join as host" : "Join";
+  return (
+    <div className="flex overflow-hidden rounded-xl border border-gray-200 bg-white">
+      <div className="flex w-7 shrink-0 items-center justify-center bg-indigo-600">
+        <span className="-rotate-90 whitespace-nowrap text-[10px] font-bold uppercase tracking-widest text-white">Today</span>
+      </div>
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3 p-3">
+        <div className="h-16 w-24 shrink-0 overflow-hidden rounded-lg bg-gray-100">
+          {session.thumbnailUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={session.thumbnailUrl} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <div className="flex h-full items-center justify-center text-gray-300">
+              <Video className="h-6 w-6" />
+            </div>
+          )}
+        </div>
+        <div className="min-w-0 flex-1 basis-40">
+          <p className="flex items-center gap-2 text-xs font-semibold text-indigo-700">
+            {clock(session.startAt)} - {clock(session.endAt)}
+            {live && <span className="rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white">Live</span>}
+          </p>
+          <p className="truncate text-base font-bold text-gray-900">{session.title}</p>
+          <p className="truncate text-xs text-gray-500">By {session.hostName}</p>
+        </div>
+        <div className="flex shrink-0 flex-col items-end gap-1.5">
+          <p className="text-xs font-semibold">
+            {live ? (
+              <span className="text-red-600">Ends in: {countdown(end - now)}</span>
+            ) : (
+              <span className="text-gray-600">Starts in: {countdown(start - now)}</span>
+            )}
+          </p>
+          {session.joinUrl ? (
+            <a
+              href={session.joinUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+            >
+              <Video className="h-4 w-4" /> {label}
+            </a>
+          ) : (
+            <span
+              title="Opens 15 minutes before the start"
+              className="inline-flex cursor-not-allowed items-center gap-2 rounded-lg bg-gray-200 px-4 py-2 text-sm font-semibold text-gray-400"
+            >
+              <Video className="h-4 w-4" /> {label}
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function UpcomingWorkshops({ isCreator }: { isCreator: boolean }) {
+  const [sessions, setSessions] = useState<SessionItem[] | null>(null);
+  const [now, setNow] = useState(0);
+  const refetched = useRef(new Set<string>());
+
+  const load = useCallback(() => {
+    fetch("/api/workshops?tab=upcoming&limit=12")
+      .then((r) => (r.ok ? r.json() : []))
+      .then(setSessions)
+      .catch(() => setSessions([]));
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  // One shared clock for the countdowns.
+  useEffect(() => {
+    const tick = () => setNow(Date.now());
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  // A learner's join link only exists once the window opens, so fetch again when that happens.
+  useEffect(() => {
+    if (!sessions || !now) return;
+    const due = sessions.find(
+      (s) => !s.joinUrl && now >= Date.parse(s.startAt) - JOIN_LEAD_MS && now < Date.parse(s.endAt) && !refetched.current.has(s.key)
+    );
+    if (due) {
+      refetched.current.add(due.key);
+      load();
+    }
+  }, [now, sessions, load]);
+
+  const today = new Date(now || 0);
+  const open = (sessions || []).filter((s) => !now || Date.parse(s.endAt) > now);
+  const todays = open.filter((s) => now && sameDay(new Date(s.startAt), today));
+  const later = open.filter((s) => !todays.includes(s)).slice(0, 6);
+
+  return (
+    <div className="space-y-3">
+      {todays.map((s) => (
+        <TodayCard key={s.key} session={s} now={now} isCreator={isCreator} />
+      ))}
+
+      <Card>
+        <div className="p-5">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900">Upcoming workshops</h2>
+            <Link href={`${isCreator ? "/creator" : "/student"}/workshops`} className="text-sm font-medium text-indigo-600 hover:underline">
+              See all
+            </Link>
+          </div>
+          {sessions === null ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+            </div>
+          ) : later.length === 0 ? (
+            <div className="flex flex-col items-center py-6 text-center">
+              <Clock className="mb-3 h-10 w-10 text-gray-300" />
+              <p className="max-w-sm text-sm text-gray-500">
+                {todays.length > 0
+                  ? "Nothing else is scheduled after today's sessions."
+                  : "Your scheduled sessions will appear here. Add them to your calendar and join when the button appears."}
+              </p>
+            </div>
+          ) : (
+            <div className="mt-3 flex gap-3 overflow-x-auto pb-1">
+              {later.map((s) => {
+                const date = new Date(s.startAt);
+                return (
+                  <div key={s.key} className="flex w-72 shrink-0 items-start gap-3 rounded-lg border border-gray-200 p-3">
+                    <div className="w-12 shrink-0 overflow-hidden rounded-md border border-gray-200 text-center">
+                      <p className="bg-indigo-600 py-0.5 text-[10px] font-bold uppercase text-white">
+                        {date.toLocaleDateString([], { month: "short" })}
+                      </p>
+                      <p className="text-xl font-bold leading-tight text-gray-900">{date.getDate()}</p>
+                      <p className="pb-0.5 text-[10px] text-gray-500">{date.toLocaleDateString([], { weekday: "short" })}</p>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs text-indigo-700">
+                        {date.toLocaleDateString([], { day: "numeric", month: "long" })} · {clock(s.startAt)} - {clock(s.endAt)}
+                      </p>
+                      <p className="truncate text-sm font-semibold text-gray-900">{s.title}</p>
+                      <p className="truncate text-xs text-gray-500">By {s.hostName}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </Card>
     </div>
   );
 }
@@ -355,19 +530,7 @@ export function FeedView({
           </Card>
         )}
 
-        <Card>
-          <div className="p-5">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">Upcoming workshops</h2>
-            </div>
-            <div className="flex flex-col items-center py-6 text-center">
-              <Clock className="mb-3 h-10 w-10 text-gray-300" />
-              <p className="max-w-sm text-sm text-gray-500">
-                Your scheduled sessions will appear here. Add them to your calendar and join when the button appears.
-              </p>
-            </div>
-          </div>
-        </Card>
+        <UpcomingWorkshops isCreator={isCreator} />
 
         <h2 className="pt-2 text-xl font-bold text-gray-900">Feed</h2>
 

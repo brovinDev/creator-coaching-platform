@@ -249,7 +249,7 @@ export function CreatePostModal({
             <button
               type="button"
               onClick={() => setStep("compose")}
-              className="cursor-pointer rounded-lg bg-gray-900 px-5 py-2 text-sm font-semibold text-white hover:bg-gray-700"
+              className="cursor-pointer rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
             >
               Save changes
             </button>
@@ -369,7 +369,7 @@ export function CreatePostModal({
               }}
               className={cn(
                 "flex cursor-pointer items-center gap-2 text-sm font-semibold",
-                schedule ? "text-indigo-700" : "text-blue-600 hover:text-blue-800"
+                schedule ? "text-indigo-700" : "text-indigo-600 hover:text-indigo-800"
               )}
             >
               <Clock className="h-5 w-5" />
@@ -379,7 +379,7 @@ export function CreatePostModal({
               type="button"
               onClick={publish}
               disabled={!canPublish}
-              className="ml-auto cursor-pointer rounded-lg bg-gray-900 px-6 py-2.5 text-sm font-semibold text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+              className="ml-auto cursor-pointer rounded-lg bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-gray-300"
             >
               {publishing ? "Publishing..." : schedule ? "Schedule post" : "Publish"}
             </button>
