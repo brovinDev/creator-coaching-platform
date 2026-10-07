@@ -1,6 +1,7 @@
 "use client";
 
 import { buttonStyle } from "@/lib/branding-colors";
+import { ThemeScope } from "@/components/theme-scope";
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -115,7 +116,7 @@ function PaymentSuccessContent() {
   const buttonUrl = successConfig?.customButton ? (successConfig.customButtonUrl || "/student") : "/student";
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center px-4 py-8">
+    <ThemeScope color={themeColor} className="min-h-screen bg-gray-100 flex items-center justify-center px-4 py-8">
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="flex justify-center mb-0">
@@ -197,7 +198,7 @@ function PaymentSuccessContent() {
           )}
         </div>
       </div>
-    </div>
+    </ThemeScope>
   );
 }
 

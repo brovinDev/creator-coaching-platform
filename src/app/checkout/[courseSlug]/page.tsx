@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
 import { buttonStyle } from "@/lib/branding-colors";
+import { ThemeScope } from "@/components/theme-scope";
 import toast from "react-hot-toast";
 
 const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME || "Open Slate";
@@ -311,7 +312,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
     <>
       <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="afterInteractive" />
 
-      <div className="min-h-screen bg-gray-100">
+      <ThemeScope color={service.branding?.themeColor} className="min-h-screen bg-gray-100">
         {/* Top bar with logo */}
         <div className="bg-white border-b border-gray-200 px-6 py-4">
           {service.creator.logo ? (
@@ -570,7 +571,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
                   onClick={handlePayment}
                   disabled={submitting || authStep !== "done"}
                   className="w-full mt-5 py-3.5 bg-gray-400 hover:bg-gray-500 disabled:bg-gray-300 text-white rounded-lg text-sm font-semibold transition-colors cursor-pointer disabled:cursor-not-allowed"
-                  style={authStep === "done" ? buttonStyle(service.branding?.themeColor || "#374151") : {}}
+                  style={authStep === "done" ? buttonStyle(service.branding?.themeColor) : {}}
                 >
                   {submitting ? "Processing..." : isFree ? "Register" : `Proceed to pay ${formatPrice(totalAmount)}`}
                 </button>
@@ -603,7 +604,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
             </div>
           </div>
         </div>
-      </div>
+      </ThemeScope>
     </>
   );
 }

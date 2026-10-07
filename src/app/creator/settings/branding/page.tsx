@@ -153,7 +153,7 @@ export default function BrandingPage() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Could not save");
       setForm(formFromApi(data));
-      toast.success("Branding saved");
+      toast.success("Platform settings saved");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not save");
     } finally {
@@ -167,9 +167,9 @@ export default function BrandingPage() {
 
   return (
     <div className="max-w-4xl">
-      <h1 className="text-2xl font-bold text-gray-900 mb-1">Branding</h1>
+      <h1 className="text-2xl font-bold text-gray-900 mb-1">Platform Settings</h1>
       <p className="text-sm text-gray-500 mb-6">
-        Your logo and colour appear on your service pages, checkout and payment pages. Anything left empty uses the default.
+        Your logo and colour appear on your service pages, checkout and payment pages, and your learners see your colour across the app. Anything left empty uses the default.
       </p>
 
       <div className="space-y-6">
@@ -229,7 +229,7 @@ export default function BrandingPage() {
                 </button>
               )}
             </div>
-            <p className="mt-2 text-xs text-gray-400">Used for the Buy Now / Register buttons and other accents on your pages.</p>
+            <p className="mt-2 text-xs text-gray-400">Used throughout your site and products: buttons, links, highlights and the active tab.</p>
           </CardContent>
         </Card>
 

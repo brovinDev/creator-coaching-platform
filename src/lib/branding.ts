@@ -1,5 +1,6 @@
 import { nocodeDb } from "@/lib/nocode/db";
 import { isValidHexColor } from "@/lib/branding-colors";
+import { learnerAccess } from "@/lib/feed";
 
 const SYSTEM_TOKEN = process.env.NOCODE_SYSTEM_TOKEN || "";
 
@@ -76,4 +77,11 @@ export function brandingFieldsFromBody(body: Record<string, unknown>): Record<st
     data[key] = value;
   }
   return data;
+}
+
+/** A learner sees the branding of the first creator they bought from. */
+export async function getLearnerBranding(userId: string, token = SYSTEM_TOKEN): Promise<Branding> {
+  const { creatorIds } = await learnerAccess(userId, token).catch(() => ({ creatorIds: new Set<string>() }));
+  const first = [...creatorIds][0];
+  return first ? getBranding(first, token) : brandingFromRow(null);
 }

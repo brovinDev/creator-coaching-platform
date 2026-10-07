@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { getBranding } from "@/lib/branding";
 import { buttonStyle } from "@/lib/branding-colors";
+import { ThemeScope } from "@/components/theme-scope";
 
 const SYSTEM_TOKEN = process.env.NOCODE_SYSTEM_TOKEN || "";
 const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME || "Open Slate";
@@ -86,7 +87,7 @@ export default async function ServicePreviewPage({
   const checkoutUrl = `/checkout/${serviceSlug}`;
 
   return (
-    <div className="min-h-screen bg-white flex flex-col">
+    <ThemeScope color={branding.themeColor} className="min-h-screen bg-white flex flex-col">
       <div className="flex-1 max-w-lg mx-auto w-full px-4 py-8">
         <div className="flex justify-center mb-6">
           {logoUrl ? (
@@ -175,6 +176,6 @@ export default async function ServicePreviewPage({
           </div>
         </div>
       </div>
-    </div>
+    </ThemeScope>
   );
 }
