@@ -2,12 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { nocodeDb } from "@/lib/nocode/db";
 import { auth, getNocodeToken } from "@/lib/auth";
 import { loadUsableCoupon, serviceTotal } from "@/lib/coupons";
-import Razorpay from "razorpay";
+import { createRazorpayOrder } from "@/lib/nocode/client";
 
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID!,
-  key_secret: process.env.RAZORPAY_KEY_SECRET!,
-});
+const SYSTEM_TOKEN = process.env.NOCODE_SYSTEM_TOKEN || "";
 
 export async function POST(req: NextRequest) {
   try {
@@ -65,11 +62,15 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const razorpayOrder = await razorpay.orders.create({
-      amount: price * 100,
-      currency: "INR",
-      receipt: `order_${Date.now()}`,
-    });
+    const razorpayOrder = await createRazorpayOrder(
+      {
+        amount: price * 100,
+        currency: "INR",
+        description: `Order for ${course.title || "service"}`,
+        metadata: { user_id: session.user.id, service_id: String(serviceId || ""), course_id: String(courseId) },
+      },
+      SYSTEM_TOKEN
+    );
 
     await nocodeDb.orders.create(
       {
@@ -79,7 +80,7 @@ export async function POST(req: NextRequest) {
         amount: price,
         currency: "INR",
         status: "pending",
-        razorpay_order_id: razorpayOrder.id,
+        razorpay_order_id: razorpayOrder.orderId,
         coupon_id: couponId || null,
         custom_fields: customFields ? JSON.stringify(customFields) : null,
       },
@@ -87,10 +88,10 @@ export async function POST(req: NextRequest) {
     );
 
     return NextResponse.json({
-      razorpayOrderId: razorpayOrder.id,
+      razorpayOrderId: razorpayOrder.orderId,
       amount: price * 100,
       currency: "INR",
-      key: process.env.RAZORPAY_KEY_ID,
+      key: razorpayOrder.keyId,
     });
   } catch (error) {
     console.error("Create order error:", error);

@@ -265,27 +265,39 @@ export async function uploadFile(formData: FormData, token: string) {
 // Payments
 // ------------------------------------------------------------------
 
-export async function createPaymentCheckout(data: {
-  amount: number;
-  currency: string;
-  description: string;
-  metadata: Record<string, unknown>;
-  successUrl: string;
-  cancelUrl: string;
-}) {
-  return request("/api/payments/checkout", {
+/** Creates a Razorpay order with the keys connected to the org's payment integration. `amount` is in paise. */
+export async function createRazorpayOrder(
+  data: { amount: number; currency: string; description: string; metadata?: Record<string, string> },
+  token: string
+) {
+  return request<{ orderId: string; keyId: string }>("/api/payments/intent", {
     method: "POST",
-    body: {
-      ...data,
-      appId: Number(NOCODE_APP_ID),
-      organizationId: NOCODE_ORG_ID,
-      provider: "razorpay",
-    },
+    body: { ...data, provider: "razorpay" },
+    token,
   });
 }
 
-export async function verifyPayment(sessionId: string) {
-  return request(`/api/payments/verify?sessionId=${sessionId}&appId=${NOCODE_APP_ID}`);
+export interface RecordedPayment {
+  paymentReference?: string;
+  amount: number;
+  currency: string;
+  status: string;
+  paymentMethod?: string;
+}
+
+/**
+ * Looks up the payment recorded for a Razorpay order. The record is written by Razorpay's webhook, so
+ * returns null until the webhook has arrived.
+ */
+export async function getPaymentByOrderId(orderId: string): Promise<RecordedPayment | null> {
+  try {
+    return await request<RecordedPayment>(
+      `/api/payments/verify?sessionId=${encodeURIComponent(orderId)}&appId=${NOCODE_APP_ID}`
+    );
+  } catch (error) {
+    if (error instanceof NocodeApiError && error.status === 404) return null;
+    throw error;
+  }
 }
 
 // ------------------------------------------------------------------

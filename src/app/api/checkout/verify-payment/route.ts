@@ -3,30 +3,30 @@ import { nocodeDb } from "@/lib/nocode/db";
 import { auth } from "@/lib/auth";
 import { sendRegistrationEmails } from "@/lib/registration-emails";
 import { redeemCoupon } from "@/lib/coupons";
-import crypto from "crypto";
+import { getPaymentByOrderId } from "@/lib/nocode/client";
 
 const SYSTEM_TOKEN = process.env.NOCODE_SYSTEM_TOKEN || "";
 
-function verifyRazorpaySignature(orderId: string, paymentId: string, signature: string): boolean {
-  const body = orderId + "|" + paymentId;
-  const expectedSignature = crypto
-    .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET!)
-    .update(body)
-    .digest("hex");
-  return expectedSignature === signature;
+const POLL_ATTEMPTS = 12;
+const POLL_INTERVAL_MS = 2000;
+
+/** Waits for Razorpay's webhook to be recorded by the nocode backend, the only authority on whether money moved. */
+async function waitForSucceededPayment(razorpayOrderId: string) {
+  for (let attempt = 0; attempt < POLL_ATTEMPTS; attempt++) {
+    const payment = await getPaymentByOrderId(razorpayOrderId);
+    if (payment?.status === "succeeded") return payment;
+    if (payment?.status === "failed") return payment;
+    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+  }
+  return null;
 }
 
 export async function POST(req: NextRequest) {
   try {
     const { razorpayOrderId, razorpayPaymentId, razorpaySignature } = await req.json();
 
-    if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
+    if (!razorpayOrderId || !razorpayPaymentId) {
       return NextResponse.json({ error: "Missing payment details" }, { status: 400 });
-    }
-
-    const isValid = verifyRazorpaySignature(razorpayOrderId, razorpayPaymentId, razorpaySignature);
-    if (!isValid) {
-      return NextResponse.json({ error: "Invalid payment signature" }, { status: 400 });
     }
 
     const order = await nocodeDb.orders.findUnique({ razorpay_order_id: razorpayOrderId }, SYSTEM_TOKEN);
@@ -39,9 +39,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: "Payment already processed", courseSlug: course?.slug });
     }
 
+    const payment = await waitForSucceededPayment(razorpayOrderId);
+    if (!payment) {
+      return NextResponse.json({ error: "Payment is still being confirmed. Please check again shortly." }, { status: 504 });
+    }
+    if (payment.status !== "succeeded") {
+      return NextResponse.json({ error: "Payment was not successful" }, { status: 402 });
+    }
+    if (Number(payment.amount) !== Number(order.amount) * 100) {
+      console.error("[verify-payment] amount mismatch", { razorpayOrderId, paid: payment.amount, expected: order.amount });
+      return NextResponse.json({ error: "Payment amount does not match the order" }, { status: 400 });
+    }
+
     await nocodeDb.orders.update(
       String(order.id),
-      { status: "paid", razorpay_payment_id: razorpayPaymentId, razorpay_signature: razorpaySignature },
+      { status: "paid", razorpay_payment_id: razorpayPaymentId, razorpay_signature: razorpaySignature || null },
       SYSTEM_TOKEN
     );
 
