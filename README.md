@@ -115,6 +115,7 @@ Open http://localhost:4000.
 | `NEXTAUTH_URL`, `NEXTAUTH_SECRET` | NextAuth. Generate the secret with `openssl rand -base64 32` |
 | `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_APP_NAME` | Public URL and brand name |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM` | Sending email (`EMAIL_FROM` defaults to `SMTP_USER`) |
+| `CRON_SECRET` | Shared secret the backend scheduler uses to call `/api/cron/reminders` (workshop reminder emails). Generate with `openssl rand -hex 32` |
 | `BEEFREE_CLIENT_ID`, `BEEFREE_CLIENT_SECRET` | Visual email editor. Without them the visual editor reports it is unavailable and the simple text editor still works |
 
 Razorpay and Cloudinary keys are **not** in this file any more. They live on the nocode org (steps 4 and 5).
@@ -126,6 +127,16 @@ Razorpay and Cloudinary keys are **not** in this file any more. They live on the
 - **Placeholders:** `{contact.firstname}`, `{contact.lastname}`, `{contact.fullname}`, `{contact.email}`, `{service.name}`, `{order.amount}`, `{order.transaction_id}`, `{creator.name}`, `{link.dashboard}`. Unknown placeholders are left as written.
 - **Beefree free plan:** the editor toolbar cannot be hidden, and Beefree's own plain-text export is paid, so plain text is generated here.
 - A creator's own email is added to their profile when they sign in, so the registration notification only reaches them after their next sign-in.
+
+## Workshop reminder emails
+
+Learners of a workshop's linked services get a reminder **24 hours**, **1 hour** and **5 minutes** before every session (single or recurring). Creators switch each one on or off under Automation > Email Automation; they are on by default.
+
+- **Who sends:** this app, over SMTP. The nocode backend only provides the clock: a scheduler job in `nocode-backend/src/open-slate/` calls `POST /api/cron/reminders` once a minute with `Authorization: Bearer <CRON_SECRET>`.
+- **Backend setup:** set `OPEN_SLATE_WEB_URL` (this app's public URL) and `OPEN_SLATE_CRON_SECRET` (same value as `CRON_SECRET` here) in the backend's `.env`, then restart it once. Without both, nothing is scheduled.
+- **At most once:** each (workshop, session, reminder) is recorded in the `workshop_reminders` module before sending, so restarts and retries never email learners twice. If the backend is down, a reminder is skipped once it is more than 10 minutes late rather than sent at the wrong time.
+- **Content:** built-in emails using the creator's email logo and theme colour. The 24 hour and 1 hour emails link to the learner's Workshops page; the 5 minute email carries the meeting link. Times are shown in the workshop's timezone.
+- **Needs an email address:** learners only get reminders if their profile has an email, which is saved when they sign in. Custom reminder designs are not built yet.
 
 ## Payment flow
 

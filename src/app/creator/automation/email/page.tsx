@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { cn } from "@/lib/utils";
+import { REMINDERS } from "@/lib/workshop-reminder-schedule";
 
 interface ServiceRow {
   id: string;
@@ -18,7 +19,9 @@ interface ServiceRow {
   updated_at: string | null;
 }
 
-interface Settings {
+type ReminderSetting = (typeof REMINDERS)[number]["setting"];
+
+interface Settings extends Record<ReminderSetting, boolean> {
   from_name: string;
   reply_to: string;
   confirmation_enabled: boolean;
@@ -55,6 +58,7 @@ function Toggle({ checked, onChange, disabled, label }: {
 
 // Same list as TagMango. Only the confirmation email has a trigger in this app so far;
 // the rest are shown for parity but stay switched off until their events exist.
+// The three workshop reminders are live (REMINDERS); the rest of the list is parity only.
 const UPCOMING_TEMPLATE_TYPES = [
   "Reminder Email on Purchase Drop-off",
   "Reminder Email on Failed Purchase",
@@ -69,9 +73,6 @@ const UPCOMING_TEMPLATE_TYPES = [
   "Notification Email on Recurring Workshop Creation",
   "Notification Email on Rescheduling a workshop",
   "Notification Email on Workshop Cancellation",
-  "Reminder Email 24 hours before Workshop",
-  "Reminder Email 30 mins before Workshop",
-  "Reminder Email 15 mins before Workshop",
   "Post Workshop Email 15 mins after Workshop",
   "Notification Email after subscription expired",
   "Notification Email for 10% course completion",
@@ -120,7 +121,14 @@ export default function EmailAutomationPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
-  const [settings, setSettings] = useState<Settings>({ from_name: "", reply_to: "", confirmation_enabled: true });
+  const [settings, setSettings] = useState<Settings>({
+    from_name: "",
+    reply_to: "",
+    confirmation_enabled: true,
+    reminder_24h_enabled: true,
+    reminder_1h_enabled: true,
+    reminder_5m_enabled: true,
+  });
   const [saved, setSaved] = useState({ from_name: "", reply_to: "" });
   const [savingSettings, setSavingSettings] = useState(false);
   const [services, setServices] = useState<ServiceRow[]>([]);
@@ -191,6 +199,20 @@ export default function EmailAutomationPage() {
     if (!res.ok) {
       setSettings((s) => ({ ...s, confirmation_enabled: previous }));
       toast.error("Failed to update the email");
+    }
+  }
+
+  async function toggleReminder(setting: ReminderSetting, next: boolean) {
+    const previous = settings[setting];
+    setSettings((s) => ({ ...s, [setting]: next }));
+    const res = await fetch("/api/email-automation/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ [setting]: next }),
+    });
+    if (!res.ok) {
+      setSettings((s) => ({ ...s, [setting]: previous }));
+      toast.error("Failed to update the reminder");
     }
   }
 
@@ -415,6 +437,26 @@ export default function EmailAutomationPage() {
                 )}
               </div>
             )}
+
+            {REMINDERS.map((reminder) => (
+              <div key={reminder.key} className="flex items-center border-b border-gray-100 px-6 py-4">
+                <span className="mr-3 h-6 w-6" />
+                <div className="flex-1">
+                  <p className="text-base font-medium text-gray-900">{reminder.label}</p>
+                  <p className="text-sm text-gray-500">
+                    Sent to learners of the linked services {reminder.phrase.replace("in ", "")} before each session.
+                  </p>
+                </div>
+                <div className="flex w-32 justify-center">
+                  <Toggle
+                    checked={settings[reminder.setting]}
+                    onChange={(next) => toggleReminder(reminder.setting, next)}
+                    label={reminder.label}
+                  />
+                </div>
+                <div className="w-24" />
+              </div>
+            ))}
 
             {UPCOMING_TEMPLATE_TYPES.map((type) => (
               <div key={type} className="flex items-center border-b border-gray-100 px-6 py-4 last:border-b-0">

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getNocodeToken } from "@/lib/auth";
 import { nocodeDb } from "@/lib/nocode/db";
 import { isValidEmail, requireCreator } from "@/lib/email-automation";
+import { REMINDERS } from "@/lib/workshop-reminder-schedule";
 
 export async function GET() {
   const creator = await requireCreator();
@@ -14,6 +15,8 @@ export async function GET() {
     reply_to: String(row?.reply_to || ""),
     // Unset means on.
     confirmation_enabled: row?.confirmation_enabled !== false,
+    // Workshop reminders, also on unless switched off.
+    ...Object.fromEntries(REMINDERS.map((r) => [r.setting, row?.[r.setting] !== false])),
   });
 }
 
@@ -36,6 +39,9 @@ export async function PUT(req: NextRequest) {
     data.reply_to = replyTo;
   }
   if (typeof body.confirmation_enabled === "boolean") data.confirmation_enabled = body.confirmation_enabled;
+  for (const reminder of REMINDERS) {
+    if (typeof body[reminder.setting] === "boolean") data[reminder.setting] = body[reminder.setting];
+  }
 
   const token = await getNocodeToken();
   try {
