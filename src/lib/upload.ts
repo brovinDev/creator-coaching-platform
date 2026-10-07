@@ -1,76 +1,23 @@
-import { v2 as cloudinary } from "cloudinary";
+import { uploadFile } from "@/lib/nocode/client";
 
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
+const SYSTEM_TOKEN = process.env.NOCODE_SYSTEM_TOKEN || "";
 
 export interface UploadResult {
   url: string;
   publicId: string;
-  format: string;
-  duration?: number;
 }
 
-export interface UploadProvider {
-  uploadVideo(file: Buffer, filename: string): Promise<UploadResult>;
-  uploadImage(file: Buffer, filename: string): Promise<UploadResult>;
-  deleteFile(publicId: string): Promise<void>;
+/**
+ * Uploads through the nocode backend, which stores the file with the org's connected
+ * storage integration (Cloudinary). The backend rejects files over its MAX_FILE_SIZE (100 MB by default).
+ */
+export async function uploadMedia(file: File, filename: string, uploadedBy: string): Promise<UploadResult> {
+  const formData = new FormData();
+  formData.append("file", file, filename);
+  formData.append("moduleName", "open-slate");
+  formData.append("uploadedBy", uploadedBy);
+
+  const json = (await uploadFile(formData, SYSTEM_TOKEN)) as { data?: { filePath?: string; publicId?: string } };
+  if (!json.data?.filePath) throw new Error("Upload failed");
+  return { url: json.data.filePath, publicId: json.data.publicId || "" };
 }
-
-const cloudinaryProvider: UploadProvider = {
-  async uploadVideo(file: Buffer, filename: string): Promise<UploadResult> {
-    return new Promise((resolve, reject) => {
-      cloudinary.uploader
-        .upload_stream(
-          {
-            resource_type: "video",
-            folder: "creator-platform/videos",
-            public_id: filename.replace(/\.[^.]+$/, ""),
-          },
-          (error, result) => {
-            if (error || !result) return reject(error || new Error("Upload failed"));
-            resolve({
-              url: result.secure_url,
-              publicId: result.public_id,
-              format: result.format,
-              duration: result.duration,
-            });
-          }
-        )
-        .end(file);
-    });
-  },
-
-  async uploadImage(file: Buffer, filename: string): Promise<UploadResult> {
-    return new Promise((resolve, reject) => {
-      cloudinary.uploader
-        .upload_stream(
-          {
-            resource_type: "image",
-            folder: "creator-platform/images",
-            public_id: filename.replace(/\.[^.]+$/, ""),
-          },
-          (error, result) => {
-            if (error || !result) return reject(error || new Error("Upload failed"));
-            resolve({
-              url: result.secure_url,
-              publicId: result.public_id,
-              format: result.format,
-            });
-          }
-        )
-        .end(file);
-    });
-  },
-
-  async deleteFile(publicId: string): Promise<void> {
-    await cloudinary.uploader.destroy(publicId);
-  },
-};
-
-// Switch provider here when migrating to S3
-// import { s3Provider } from "./upload-s3";
-// export const upload: UploadProvider = s3Provider;
-export const upload: UploadProvider = cloudinaryProvider;
