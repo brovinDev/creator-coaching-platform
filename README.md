@@ -176,8 +176,6 @@ Services that cost nothing, or reach ₹0 with a coupon, enroll through `POST /a
 | `npm run lint` | Lint |
 | `npx tsc --noEmit` | Type check |
 
-The Prisma scripts and the `prisma/` folder are left over from before the move to the nocode backend and are not used.
-
 ## Roles
 
 - Signup creates **creators** only.
