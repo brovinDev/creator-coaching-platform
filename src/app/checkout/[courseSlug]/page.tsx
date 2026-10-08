@@ -28,6 +28,8 @@ interface CustomField {
 
 interface ServiceData {
   id: string;
+  /** "service" is the normal case. "course" is an older link that buys a course directly. */
+  kind: "service" | "course";
   courseId: string;
   title: string;
   description: string;
@@ -40,6 +42,11 @@ interface ServiceData {
   creator: { name: string; logo: string | null };
   branding?: { themeColor: string; termsUrl: string; privacyUrl: string };
   customFields: CustomField[];
+}
+
+/** What the server is asked to sell: the service, or (older links only) the course. Never both. */
+function purchaseTarget(item: ServiceData) {
+  return item.kind === "service" ? { serviceId: item.id } : { courseId: item.id };
 }
 
 declare global {
@@ -93,15 +100,13 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
     const serviceRes = await fetch(`/api/public/services/${courseSlug}`);
     if (serviceRes.ok) {
       const s = await serviceRes.json();
-      const courseIdStr = String(s.course_id || "");
-      const firstCourseId = courseIdStr.split(",").filter(Boolean)[0]?.trim() || "";
       let customFields: CustomField[] = [];
       try {
         const pc = typeof s.payment_config === "string" ? JSON.parse(s.payment_config) : s.payment_config;
         if (pc?.customFields) customFields = pc.customFields.filter((f: CustomField) => !f.hidden);
       } catch { /* ignore */ }
       setService({
-        id: s.id, courseId: firstCourseId,
+        id: s.id, kind: "service", courseId: "",
         title: s.title || "", description: s.description || "",
         coverImage: s.cover_image || null,
         price: Number(s.price) || 0,
@@ -119,7 +124,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
     if (courseRes.ok) {
       const c = await courseRes.json();
       setService({
-        id: c.id, courseId: c.id,
+        id: c.id, kind: "course", courseId: c.id,
         title: c.title || "", description: c.description || "",
         coverImage: c.thumbnail || null,
         price: Number(c.price) || 0, discountedPrice: null,
@@ -230,7 +235,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
       const res = await fetch("/api/coupons/validate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: couponCode, serviceId: service?.id }),
+        body: JSON.stringify({ code: couponCode, serviceId: service?.kind === "service" ? service.id : undefined }),
       });
       const data = await res.json();
       if (res.ok && data.valid) {
@@ -263,7 +268,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
       if (isFree) {
         const res = await fetch("/api/checkout/free-enroll", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ courseId: service.courseId, serviceId: service.id, couponId: appliedCoupon?.couponId, customFields: customFieldValues }),
+          body: JSON.stringify({ ...purchaseTarget(service), couponId: appliedCoupon?.couponId, customFields: customFieldValues }),
         });
         if (res.ok) {
           const p = new URLSearchParams({ amount: "0", service: service.title, method: "Free", sid: service.id });
@@ -274,7 +279,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
       }
       const orderRes = await fetch("/api/checkout/create-order", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ courseId: service.courseId, serviceId: service.id, amount: totalAmount, couponId: appliedCoupon?.couponId, customFields: customFieldValues }),
+        body: JSON.stringify({ ...purchaseTarget(service), couponId: appliedCoupon?.couponId, customFields: customFieldValues }),
       });
       const orderData = await orderRes.json();
       if (!orderRes.ok) { toast.error(orderData.error || "Failed to create order"); setSubmitting(false); return; }
