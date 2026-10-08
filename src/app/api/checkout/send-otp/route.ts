@@ -1,40 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
-import { nocodeDb } from "@/lib/nocode/db";
-import { sendEmail, otpEmail } from "@/lib/email";
+import { nocodeUserByEmail } from "@/lib/nocode/client";
+import { isEmail, issueOtp, normalizeEmail } from "@/lib/otp-auth";
+import { nameProblem } from "@/lib/account";
 
 const SYSTEM_TOKEN = process.env.NOCODE_SYSTEM_TOKEN || "";
 
+/** Checkout: emails a code to a new or returning learner. A returning learner does not need to give a name. */
 export async function POST(req: NextRequest) {
   try {
-    const { name, email } = await req.json();
+    const body = await req.json();
+    const email = normalizeEmail(body.email);
+    let name = String(body.name || "").trim();
+    if (!isEmail(email)) return NextResponse.json({ error: "Enter a valid email address" }, { status: 400 });
 
-    if (!name || !email) {
-      return NextResponse.json({ error: "Name and email are required" }, { status: 400 });
+    const existing = await nocodeUserByEmail(email, SYSTEM_TOKEN);
+    if (existing) {
+      name = existing.firstName;
+    } else {
+      if (!name) return NextResponse.json({ error: "Please enter your name to create your account.", needsName: true }, { status: 400 });
+      const badName = nameProblem(name);
+      if (badName) return NextResponse.json({ error: badName }, { status: 400 });
     }
 
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-
-    await nocodeDb.emailOtps.deleteWhere({ email }, SYSTEM_TOKEN).catch(() => {});
-
-    await nocodeDb.emailOtps.create(
-      {
-        email,
-        otp,
-        name,
-        password: "",
-        role: "STUDENT",
-        expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
-      },
-      SYSTEM_TOKEN
-    );
-
-    const emailContent = otpEmail(name, otp);
-    await sendEmail({ to: email, ...emailContent });
-
-    return NextResponse.json({ message: "OTP sent to your email" });
+    const sent = await issueOtp({ email, name, role: "STUDENT" });
+    if (!sent.ok) return NextResponse.json({ error: sent.error }, { status: sent.status });
+    return NextResponse.json({ message: "We emailed you a code", existingAccount: Boolean(existing) });
   } catch (error) {
     console.error("Checkout send OTP error:", error);
-    const message = error instanceof Error ? error.message : "Failed to send OTP";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: "Could not send the code. Please try again." }, { status: 500 });
   }
 }

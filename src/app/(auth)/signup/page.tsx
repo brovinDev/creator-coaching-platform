@@ -1,59 +1,46 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useEffect, useState } from "react";
+import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { ArrowLeft, Mail } from "lucide-react";
+import toast from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowLeft, Mail } from "lucide-react";
-import toast from "react-hot-toast";
+import { CodeInput, emptyCode } from "@/components/auth/code-input";
 
+/** Creator sign-up: name and email, then the code we email. There is no password. */
 export default function SignupPage() {
   const router = useRouter();
-  const [step, setStep] = useState<"form" | "otp">("form");
+  const [step, setStep] = useState<"form" | "code">("form");
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState({
-    name: "",
-    email: "",
-    password: "",
-  });
-  const [otp, setOtp] = useState(["", "", "", "", "", ""]);
-  const [resendTimer, setResendTimer] = useState(0);
-  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const [form, setForm] = useState({ name: "", email: "" });
+  const [digits, setDigits] = useState(emptyCode());
+  const [resendIn, setResendIn] = useState(0);
 
   useEffect(() => {
-    if (resendTimer > 0) {
-      const t = setTimeout(() => setResendTimer(resendTimer - 1), 1000);
-      return () => clearTimeout(t);
-    }
-  }, [resendTimer]);
+    if (resendIn <= 0) return;
+    const t = setTimeout(() => setResendIn(resendIn - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendIn]);
 
-  async function handleSendOtp(e?: React.FormEvent) {
-    if (e) e.preventDefault();
-    if (form.password.length < 6) {
-      toast.error("Password must be at least 6 characters");
-      return;
-    }
+  async function sendCode(e?: React.FormEvent) {
+    e?.preventDefault();
     setLoading(true);
-
     try {
       const res = await fetch("/api/auth/send-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        toast.error(data.error || "Something went wrong");
-      } else {
-        toast.success("OTP sent to your email!");
-        setStep("otp");
-        setResendTimer(60);
-        setTimeout(() => inputRefs.current[0]?.focus(), 100);
-      }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return void toast.error(data.error || "Something went wrong");
+      toast.success("We emailed you a code");
+      setDigits(emptyCode());
+      setStep("code");
+      setResendIn(30);
     } catch {
       toast.error("Something went wrong");
     } finally {
@@ -61,29 +48,31 @@ export default function SignupPage() {
     }
   }
 
-  async function handleVerifyOtp() {
-    const otpString = otp.join("");
-    if (otpString.length !== 6) {
-      toast.error("Please enter the complete 6-digit OTP");
-      return;
-    }
+  async function verify() {
+    const code = digits.join("");
+    if (code.length !== 6) return void toast.error("Enter the 6-digit code");
     setLoading(true);
-
     try {
+      // Creates the account once the code is right...
       const res = await fetch("/api/auth/verify-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: form.email, otp: otpString }),
+        body: JSON.stringify({ email: form.email, otp: code }),
       });
-
-      const data = await res.json();
-
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         toast.error(data.error || "Verification failed");
-      } else {
-        toast.success("Email verified! Redirecting to login...");
-        router.push("/login");
+        return;
       }
+      // ...and the same code then signs them in.
+      const result = await signIn("credentials", { email: form.email, otp: code, redirect: false });
+      if (result?.error) {
+        toast.error("Your account is ready. Please sign in.");
+        router.push("/login");
+        return;
+      }
+      toast.success("Welcome!");
+      router.push("/creator");
     } catch {
       toast.error("Something went wrong");
     } finally {
@@ -91,94 +80,41 @@ export default function SignupPage() {
     }
   }
 
-  function handleOtpChange(index: number, value: string) {
-    if (value.length > 1) {
-      const digits = value.replace(/\D/g, "").split("").slice(0, 6);
-      const newOtp = [...otp];
-      digits.forEach((d, i) => {
-        if (index + i < 6) newOtp[index + i] = d;
-      });
-      setOtp(newOtp);
-      const nextIndex = Math.min(index + digits.length, 5);
-      inputRefs.current[nextIndex]?.focus();
-      return;
-    }
-
-    if (!/^\d*$/.test(value)) return;
-
-    const newOtp = [...otp];
-    newOtp[index] = value;
-    setOtp(newOtp);
-
-    if (value && index < 5) {
-      inputRefs.current[index + 1]?.focus();
-    }
-  }
-
-  function handleOtpKeyDown(index: number, e: React.KeyboardEvent) {
-    if (e.key === "Backspace" && !otp[index] && index > 0) {
-      inputRefs.current[index - 1]?.focus();
-    }
-    if (e.key === "Enter") {
-      handleVerifyOtp();
-    }
-  }
-
-  if (step === "otp") {
+  if (step === "code") {
     return (
       <Card>
         <CardContent className="pt-8 pb-8">
           <button
-            onClick={() => { setStep("form"); setOtp(["", "", "", "", "", ""]); }}
-            className="flex items-center gap-1 text-sm text-gray-500 hover:text-indigo-600 hover:bg-gray-50 px-2 py-1 rounded-md transition-colors mb-4"
+            onClick={() => setStep("form")}
+            className="mb-4 flex items-center gap-1 rounded-md px-2 py-1 text-sm text-gray-500 transition-colors hover:bg-gray-50 hover:text-indigo-600"
           >
             <ArrowLeft className="h-4 w-4" /> Back
           </button>
 
-          <div className="text-center mb-8">
-            <div className="inline-flex p-3 rounded-full bg-indigo-50 mb-4">
+          <div className="mb-8 text-center">
+            <div className="mb-4 inline-flex rounded-full bg-indigo-50 p-3">
               <Mail className="h-6 w-6 text-indigo-600" />
             </div>
             <h1 className="text-2xl font-bold text-gray-900">Check your email</h1>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="mt-1 text-sm text-gray-500">
               We sent a 6-digit code to <strong>{form.email}</strong>
             </p>
           </div>
 
-          <div className="flex justify-center gap-2 mb-6">
-            {otp.map((digit, i) => (
-              <input
-                key={i}
-                ref={(el) => { inputRefs.current[i] = el; }}
-                type="text"
-                inputMode="numeric"
-                maxLength={6}
-                value={digit}
-                onChange={(e) => handleOtpChange(i, e.target.value)}
-                onKeyDown={(e) => handleOtpKeyDown(i, e)}
-                onPaste={(e) => {
-                  e.preventDefault();
-                  const paste = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
-                  handleOtpChange(0, paste);
-                }}
-                className="w-12 h-14 text-center text-xl font-bold border-2 border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors"
-              />
-            ))}
+          <div className="mb-6">
+            <CodeInput digits={digits} onChange={setDigits} onSubmit={verify} />
           </div>
 
-          <Button onClick={handleVerifyOtp} className="w-full" loading={loading}>
+          <Button onClick={verify} className="w-full" loading={loading}>
             Verify & Create Account
           </Button>
 
-          <div className="text-center mt-4">
-            {resendTimer > 0 ? (
-              <p className="text-sm text-gray-400">Resend OTP in {resendTimer}s</p>
+          <div className="mt-4 text-center">
+            {resendIn > 0 ? (
+              <p className="text-sm text-gray-400">Send a new code in {resendIn}s</p>
             ) : (
-              <button
-                onClick={() => handleSendOtp()}
-                className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
-              >
-                Resend OTP
+              <button onClick={() => sendCode()} className="text-sm font-medium text-indigo-600 hover:text-indigo-700">
+                Send a new code
               </button>
             )}
           </div>
@@ -190,12 +126,12 @@ export default function SignupPage() {
   return (
     <Card>
       <CardContent className="pt-8 pb-8">
-        <div className="text-center mb-8">
+        <div className="mb-8 text-center">
           <h1 className="text-2xl font-bold text-gray-900">Create your account</h1>
-          <p className="text-sm text-gray-500 mt-1">Start your journey today</p>
+          <p className="mt-1 text-sm text-gray-500">Start your journey today</p>
         </div>
 
-        <form onSubmit={handleSendOtp} className="space-y-4">
+        <form onSubmit={sendCode} className="space-y-4">
           <Input
             id="name"
             label="Full Name"
@@ -213,25 +149,14 @@ export default function SignupPage() {
             onChange={(e) => setForm({ ...form, email: e.target.value })}
             required
           />
-          <Input
-            id="password"
-            label="Password"
-            type="password"
-            placeholder="••••••••"
-            value={form.password}
-            onChange={(e) => setForm({ ...form, password: e.target.value })}
-            required
-            minLength={6}
-          />
-
           <Button type="submit" className="w-full" loading={loading}>
             Continue
           </Button>
         </form>
 
-        <p className="text-center text-sm text-gray-500 mt-6">
+        <p className="mt-6 text-center text-sm text-gray-500">
           Already have an account?{" "}
-          <Link href="/login" className="text-indigo-600 hover:text-indigo-700 font-medium">
+          <Link href="/login" className="font-medium text-indigo-600 hover:text-indigo-700">
             Sign in
           </Link>
         </p>
