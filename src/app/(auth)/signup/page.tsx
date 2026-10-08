@@ -16,7 +16,6 @@ export default function SignupPage() {
   const [form, setForm] = useState({
     name: "",
     email: "",
-    password: "",
   });
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [resendTimer, setResendTimer] = useState(0);
@@ -31,10 +30,6 @@ export default function SignupPage() {
 
   async function handleSendOtp(e?: React.FormEvent) {
     if (e) e.preventDefault();
-    if (form.password.length < 6) {
-      toast.error("Password must be at least 6 characters");
-      return;
-    }
     setLoading(true);
 
     try {
@@ -213,17 +208,6 @@ export default function SignupPage() {
             onChange={(e) => setForm({ ...form, email: e.target.value })}
             required
           />
-          <Input
-            id="password"
-            label="Password"
-            type="password"
-            placeholder="••••••••"
-            value={form.password}
-            onChange={(e) => setForm({ ...form, password: e.target.value })}
-            required
-            minLength={6}
-          />
-
           <Button type="submit" className="w-full" loading={loading}>
             Continue
           </Button>

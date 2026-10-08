@@ -67,7 +67,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
 
   const [authStep, setAuthStep] = useState<AuthStep>("form");
   const [isExistingUser, setIsExistingUser] = useState(false);
-  const [form, setForm] = useState({ name: "", email: "", password: "" });
+  const [form, setForm] = useState({ name: "", email: "" });
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [resendTimer, setResendTimer] = useState(0);
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -152,18 +152,12 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
   async function handleSendOtp(e?: React.FormEvent) {
     if (e) e.preventDefault();
     if (!form.email) return;
-    if (!isExistingUser) {
-      const pw = form.password;
-      if (pw.length < 8 || !/[a-z]/.test(pw) || !/[A-Z]/.test(pw) || !/[0-9]/.test(pw) || !/[^a-zA-Z0-9]/.test(pw)) {
-        toast.error("Password needs 8+ chars with uppercase, lowercase, number & special character");
-        return;
-      }
-    }
     setSubmitting(true);
     try {
-      const res = await fetch("/api/checkout/send-otp", {
+      // Returning users get a sign-in code; new users get a registration code.
+      const res = await fetch(isExistingUser ? "/api/auth/login-otp/send" : "/api/checkout/send-otp", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: form.name, email: form.email }),
+        body: JSON.stringify(isExistingUser ? { email: form.email } : { name: form.name, email: form.email }),
       });
       const data = await res.json();
       if (!res.ok) toast.error(data.error || "Failed to send OTP");
@@ -177,31 +171,25 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
     finally { setSubmitting(false); }
   }
 
-  async function handleLogin(e: React.FormEvent) {
-    e.preventDefault();
-    if (!form.email || !form.password) return;
-    setSubmitting(true);
-    try {
-      const result = await signIn("credentials", { email: form.email, password: form.password, redirect: false });
-      if (result?.error) toast.error("Invalid email or password");
-      else { toast.success("Signed in!"); setAuthStep("done"); }
-    } catch { toast.error("Something went wrong"); }
-    finally { setSubmitting(false); }
-  }
-
   async function handleVerifyOtp() {
     const otpString = otp.join("");
     if (otpString.length !== 6) { toast.error("Enter the complete 6-digit code"); return; }
     setSubmitting(true);
     try {
+      if (isExistingUser) {
+        const result = await signIn("otp", { email: form.email, otp: otpString, redirect: false });
+        if (result?.error) toast.error("Invalid or expired code");
+        else { toast.success("Signed in!"); setAuthStep("done"); }
+        return;
+      }
       const res = await fetch("/api/checkout/verify-and-register", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: form.email, otp: otpString, name: form.name, password: form.password }),
+        body: JSON.stringify({ email: form.email, otp: otpString, name: form.name }),
       });
       const data = await res.json();
       if (!res.ok) toast.error(data.error || "Verification failed");
       else {
-        const result = await signIn("credentials", { email: form.email, password: form.password, redirect: false });
+        const result = await signIn("otp", { email: form.email, otp: otpString, redirect: false });
         if (result?.error) toast.error("Account created but login failed.");
         else { toast.success("Account created!"); setAuthStep("done"); }
       }
@@ -341,7 +329,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
                 <p className="text-2xl font-bold text-gray-900 mt-3">
                   {isFree ? "Free" : formatPrice(basePrice)}
                   {service.discountedPrice !== null && (
-                    <span className="text-base text-gray-400 line-through ml-2">
+                    <span className="text-lg font-medium text-gray-500 line-through decoration-red-500/70 ml-2">
                       {formatPrice(service.price)}
                     </span>
                   )}
@@ -378,13 +366,12 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
                         <form onSubmit={handleSendOtp} className="space-y-3">
                           <Input placeholder="Full Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
                           <Input type="email" placeholder="Enter your email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
-                          <Input type="password" placeholder="Create password (min 6 chars)" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required minLength={6} />
                           <button type="submit" disabled={submitting} className="w-full py-3 bg-red-700 hover:bg-red-800 text-white rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 cursor-pointer">
                             {submitting ? "Sending..." : "Request OTP"}
                           </button>
                         </form>
                         <p className="text-center text-xs text-gray-500 mt-3">
-                          OR, <button onClick={() => setIsExistingUser(true)} className="text-indigo-600 font-medium cursor-pointer">Sign in with password</button>
+                          OR, <button onClick={() => setIsExistingUser(true)} className="text-indigo-600 font-medium cursor-pointer">Sign in with email code</button>
                         </p>
                       </>
                     )}
@@ -394,11 +381,10 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
                         <p className="text-sm font-medium text-gray-900 mb-3 flex items-center gap-2">
                           <LogIn className="h-4 w-4" /> Sign in
                         </p>
-                        <form onSubmit={handleLogin} className="space-y-3">
+                        <form onSubmit={handleSendOtp} className="space-y-3">
                           <Input type="email" placeholder="Enter your email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
-                          <Input type="password" placeholder="Password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
                           <button type="submit" disabled={submitting} className="w-full py-3 bg-red-700 hover:bg-red-800 text-white rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 cursor-pointer">
-                            {submitting ? "Signing in..." : "Sign In"}
+                            {submitting ? "Sending..." : "Send code"}
                           </button>
                         </form>
                         <p className="text-center text-xs text-gray-500 mt-3">
@@ -546,7 +532,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
                     <span className="text-sm text-gray-900">{service.title}</span>
                     <span className="text-sm font-medium text-gray-900 shrink-0">
                       {service.discountedPrice !== null && (
-                        <span className="text-xs text-gray-400 line-through mr-2">
+                        <span className="text-sm text-gray-500 line-through decoration-red-500/70 mr-2">
                           {formatPrice(service.price)}
                         </span>
                       )}
@@ -570,7 +556,12 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
 
                   <div className="border-t border-gray-200 pt-3 flex items-center justify-between">
                     <span className="text-sm font-semibold text-gray-900">Amount to be paid :</span>
-                    <span className="text-base font-bold text-gray-900">
+                    <span className="text-lg font-bold text-gray-900">
+                      {service.discountedPrice !== null && !isFree && totalAmount < service.price && (
+                        <span className="text-sm font-medium text-gray-500 line-through decoration-red-500/70 mr-2">
+                          {formatPrice(service.price)}
+                        </span>
+                      )}
                       {isFree ? "Free" : formatPrice(totalAmount)}
                     </span>
                   </div>

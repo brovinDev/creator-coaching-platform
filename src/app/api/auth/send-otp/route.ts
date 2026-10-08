@@ -7,14 +7,10 @@ const SYSTEM_TOKEN = process.env.NOCODE_SYSTEM_TOKEN || "";
 
 export async function POST(req: NextRequest) {
   try {
-    const { name, email, password } = await req.json();
+    const { name, email } = await req.json();
 
-    if (!name || !email || !password) {
+    if (!name || !email) {
       return NextResponse.json({ error: "All fields are required" }, { status: 400 });
-    }
-
-    if (password.length < 6) {
-      return NextResponse.json({ error: "Password must be at least 6 characters" }, { status: 400 });
     }
 
     // Check if user already exists by attempting signin
@@ -37,13 +33,14 @@ export async function POST(req: NextRequest) {
     // Delete any existing unverified OTPs for this email
     await nocodeDb.emailOtps.deleteWhere({ email }, SYSTEM_TOKEN).catch(() => {});
 
-    // Store OTP record (password stored as-is; nocode backend will hash on signup)
+    // Store OTP record. No password: sign-in is by emailed code, and verify-otp gives the
+    // new account an internal random password.
     await nocodeDb.emailOtps.create(
       {
         email,
         otp,
         name,
-        password,
+        password: "",
         // Public signup is for creators only; students register from a service's checkout page.
         role: "CREATOR",
         verified: false,

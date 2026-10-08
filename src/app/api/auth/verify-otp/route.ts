@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { nocodeDb } from "@/lib/nocode/db";
 import { nocodeSignup, nocodeActivateUser } from "@/lib/nocode/client";
 import { sendEmail, welcomeEmail } from "@/lib/email";
+import { LOGIN_OTP_ROLE, generateInternalPassword } from "@/lib/otp-auth";
 
 const SYSTEM_TOKEN = process.env.NOCODE_SYSTEM_TOKEN || "";
 
@@ -19,7 +20,9 @@ export async function POST(req: NextRequest) {
       SYSTEM_TOKEN
     );
 
+    // Sign-in codes (role LOGIN) are consumed by the NextAuth otp provider, not here.
     const record = records.find((r) => {
+      if (r.role === LOGIN_OTP_ROLE) return false;
       const expires = r.expires_at ? new Date(r.expires_at as string) : null;
       return expires && expires > new Date();
     });
@@ -33,11 +36,14 @@ export async function POST(req: NextRequest) {
     // The nocode backend rejects an empty last name, so single-word names get a placeholder.
     const lastName = nameParts.slice(1).join(" ") || "-";
 
+    // Sign-in is by emailed code; the backend still needs a password, so use a random one.
+    const internalPassword = generateInternalPassword();
+
     // Create user in nocode backend
     try {
       await nocodeSignup({
         email: record.email as string,
-        password: record.password as string,
+        password: internalPassword,
         first_name: firstName,
         last_name: lastName,
       });
@@ -60,13 +66,17 @@ export async function POST(req: NextRequest) {
     const { nocodeSignin } = await import("@/lib/nocode/client");
     let userId = "";
     try {
-      const signin = await nocodeSignin(record.email as string, record.password as string);
+      const signin = await nocodeSignin(record.email as string, internalPassword);
       userId = signin.data.id;
 
       await nocodeDb.userProfiles.create(
         {
           user_id: userId,
           role: record.role as string,
+          // Lets the code-based sign-in find this account by email.
+          email: record.email as string,
+          first_name: firstName,
+          last_name: lastName,
         },
         SYSTEM_TOKEN
       );

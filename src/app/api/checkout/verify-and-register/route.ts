@@ -2,19 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { nocodeDb } from "@/lib/nocode/db";
 import { nocodeSignup, nocodeActivateUser, nocodeSignin } from "@/lib/nocode/client";
 import { sendEmail } from "@/lib/email";
+import { LOGIN_OTP_ROLE, generateInternalPassword, storeLoginOtp } from "@/lib/otp-auth";
 
 const SYSTEM_TOKEN = process.env.NOCODE_SYSTEM_TOKEN || "";
 
 export async function POST(req: NextRequest) {
   try {
-    const { email, otp, name, password } = await req.json();
+    const { email, otp, name } = await req.json();
 
-    if (!email || !otp || !name || !password) {
+    if (!email || !otp || !name) {
       return NextResponse.json({ error: "All fields are required" }, { status: 400 });
-    }
-
-    if (password.length < 6) {
-      return NextResponse.json({ error: "Password must be at least 6 characters" }, { status: 400 });
     }
 
     const records = await nocodeDb.emailOtps.findMany(
@@ -23,7 +20,8 @@ export async function POST(req: NextRequest) {
     );
 
     const record = records.find(
-      (r) => !r.verified && new Date(r.expires_at as string) > new Date()
+      (r) =>
+        r.role !== LOGIN_OTP_ROLE && !r.verified && new Date(r.expires_at as string) > new Date()
     );
 
     if (!record) {
@@ -40,10 +38,13 @@ export async function POST(req: NextRequest) {
     const firstName = nameParts[0] || name;
     const lastName = nameParts.slice(1).join(" ") || ".";
 
+    // Sign-in is by emailed code; the backend still needs a password, so use a random one.
+    const internalPassword = generateInternalPassword();
+
     try {
       await nocodeSignup({
         email,
-        password,
+        password: internalPassword,
         first_name: firstName,
         last_name: lastName,
       });
@@ -60,14 +61,21 @@ export async function POST(req: NextRequest) {
     });
 
     try {
-      const signinRes = await nocodeSignin(email, password);
+      const signinRes = await nocodeSignin(email, internalPassword);
       if (signinRes.success && signinRes.data?.id) {
         const existing = await nocodeDb.userProfiles
           .findUnique({ user_id: signinRes.data.id }, SYSTEM_TOKEN)
           .catch(() => null);
         if (!existing) {
           await nocodeDb.userProfiles.create(
-            { user_id: signinRes.data.id, role: "STUDENT" },
+            {
+              user_id: signinRes.data.id,
+              role: "STUDENT",
+              // Lets the code-based sign-in find this account by email.
+              email,
+              first_name: firstName,
+              last_name: lastName,
+            },
             SYSTEM_TOKEN
           );
         }
@@ -76,7 +84,9 @@ export async function POST(req: NextRequest) {
       // Profile creation is non-critical
     }
 
-    await nocodeDb.emailOtps.deleteWhere({ email }, SYSTEM_TOKEN);
+    // The code is used up by registering. Re-issue it as a sign-in code so the checkout page
+    // can sign the new user in with the same code they just entered.
+    await storeLoginOtp(email, otp);
 
     await sendEmail({
       to: email,
