@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { auth, getNocodeToken } from "@/lib/auth";
+import { nocodeDb } from "@/lib/nocode/db";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -8,25 +8,35 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const community = await db.community.findUnique({ where: { creatorId: session.user.id } });
-  if (!community) return NextResponse.json({ error: "No community found" }, { status: 404 });
+  const token = await getNocodeToken();
 
+  const communities = await nocodeDb.communities.findMany(
+    { where: { creator_id: session.user.id } },
+    token
+  );
+  if (communities.length === 0) {
+    return NextResponse.json({ error: "No community found" }, { status: 404 });
+  }
+
+  const community = communities[0];
   const { name, description } = await req.json();
   if (!name?.trim()) return NextResponse.json({ error: "Name is required" }, { status: 400 });
 
-  const maxPos = await db.communityChannel.aggregate({
-    where: { communityId: community.id },
-    _max: { position: true },
-  });
+  const existingChannels = await nocodeDb.communityChannels.findMany(
+    { where: { community_id: String(community.id) }, orderBy: { position: "desc" } },
+    token
+  );
+  const maxPos = existingChannels.length > 0 ? Number(existingChannels[0].position) || 0 : -1;
 
-  const channel = await db.communityChannel.create({
-    data: {
+  const channel = await nocodeDb.communityChannels.create(
+    {
       name,
       description: description || null,
-      communityId: community.id,
-      position: (maxPos._max.position ?? -1) + 1,
+      community_id: String(community.id),
+      position: maxPos + 1,
     },
-  });
+    token
+  );
 
   return NextResponse.json(channel);
 }

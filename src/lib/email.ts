@@ -1,7 +1,8 @@
+import { readableTextColor } from "@/lib/branding-colors";
 import nodemailer from "nodemailer";
 
 const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
+  host: process.env.SMTP_HOST || "smtp.gmail.com",
   port: Number(process.env.SMTP_PORT) || 587,
   secure: false,
   auth: {
@@ -14,14 +15,24 @@ interface SendEmailOptions {
   to: string;
   subject: string;
   html: string;
+  /** Plain-text alternative sent alongside the HTML. */
+  text?: string;
+  /** Display name shown to the recipient; the sending address stays the platform's. */
+  fromName?: string;
+  replyTo?: string;
 }
 
-export async function sendEmail({ to, subject, html }: SendEmailOptions) {
+export async function sendEmail({ to, subject, html, text, fromName, replyTo }: SendEmailOptions) {
+  const address = process.env.EMAIL_FROM || process.env.SMTP_USER;
+  // Strip anything that could break out of the quoted display name or inject a header.
+  const safeName = fromName?.replace(/[\r\n"<>]/g, "").trim();
   await transporter.sendMail({
-    from: process.env.EMAIL_FROM || "noreply@creatorplatform.com",
+    from: safeName && address ? `"${safeName}" <${address}>` : address,
     to,
     subject,
     html,
+    ...(text ? { text } : {}),
+    ...(replyTo ? { replyTo } : {}),
   });
 }
 
@@ -36,7 +47,7 @@ export function otpEmail(name: string, otp: string) {
           <div style="margin-bottom: 8px;">
             ${otp.split("").map((d) => `<span style="display: inline-block; width: 40px; height: 48px; line-height: 48px; margin: 0 3px; background: white; border-radius: 8px; font-size: 28px; font-weight: bold; color: #4f46e5; border: 2px solid #e0e7ff;">${d}</span>`).join("")}
           </div>
-          <p style="margin: 12px 0 0; font-size: 13px; color: #6b7280;">Tap and hold to copy → <span style="user-select: all; -webkit-user-select: all; font-weight: bold; color: #4f46e5; letter-spacing: 2px; padding: 2px 8px; background: white; border-radius: 4px;">${otp}</span></p>
+          <p style="margin: 12px 0 0; font-size: 13px; color: #6b7280;">Tap and hold to copy: <span style="user-select: all; -webkit-user-select: all; font-weight: bold; color: #4f46e5; letter-spacing: 2px; padding: 2px 8px; background: white; border-radius: 4px;">${otp}</span></p>
         </div>
         <p style="color: #666;">This code expires in 10 minutes. If you didn't request this, ignore this email.</p>
       </div>
@@ -104,9 +115,127 @@ export function creatorPurchaseNotificationEmail(creatorName: string, studentNam
     subject: `New Purchase: ${courseName}`,
     html: `
       <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-        <h1 style="color: #1a1a1a;">New Sale! 🎉</h1>
+        <h1 style="color: #1a1a1a;">New Sale!</h1>
         <p>Hi ${creatorName}, ${studentName} just purchased <strong>${courseName}</strong> for ₹${amount}.</p>
         <a href="${process.env.NEXT_PUBLIC_APP_URL}/creator/payments" style="display: inline-block; padding: 12px 24px; background: #6366f1; color: white; text-decoration: none; border-radius: 6px;">View Payments</a>
+      </div>
+    `,
+  };
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+export function formatAmount(amount: number, currency = "INR") {
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(amount);
+}
+
+function formatDate(iso: string) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
+}
+
+export interface ServiceRegistrationEmailInput {
+  name: string;
+  serviceName: string;
+  /** 0 (or omitted) means the service was free — no receipt is shown. */
+  amount?: number;
+  currency?: string;
+  transactionId?: string;
+  /** ISO date; only mentioned when it is in the future. */
+  startDate?: string | null;
+  /** Creator branding: image shown above the heading, and the button colour (#rrggbb). */
+  logoUrl?: string;
+  buttonColor?: string;
+}
+
+/**
+ * The single email a learner gets after registering for a service.
+ * Free services get a welcome; paid services get the same welcome with a receipt,
+ * so a purchase never produces two separate emails.
+ */
+export function serviceRegistrationEmail(input: ServiceRegistrationEmailInput) {
+  const name = escapeHtml(input.name || "there");
+  const service = escapeHtml(input.serviceName);
+  const paid = (input.amount ?? 0) > 0;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  const appName = escapeHtml(process.env.NEXT_PUBLIC_APP_NAME || "Open Slate");
+
+  const startsLater =
+    input.startDate && new Date(input.startDate).getTime() > Date.now()
+      ? formatDate(input.startDate)
+      : "";
+
+  const receipt = paid
+    ? `
+        <table style="width: 100%; margin: 20px 0; border-collapse: collapse; font-size: 14px;">
+          <tr>
+            <td style="padding: 8px 0; color: #6b7280;">Amount paid</td>
+            <td style="padding: 8px 0; text-align: right; font-weight: bold;">${formatAmount(input.amount!, input.currency)}</td>
+          </tr>
+          ${
+            input.transactionId
+              ? `<tr>
+            <td style="padding: 8px 0; color: #6b7280; border-top: 1px solid #e5e7eb;">Transaction ID</td>
+            <td style="padding: 8px 0; text-align: right; border-top: 1px solid #e5e7eb; font-family: monospace;">${escapeHtml(input.transactionId)}</td>
+          </tr>`
+              : ""
+          }
+        </table>`
+    : "";
+
+  return {
+    subject: paid ? `Payment confirmed - ${input.serviceName}` : `You're registered for ${input.serviceName}`,
+    html: `
+      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+        ${input.logoUrl ? `<img src="${escapeHtml(input.logoUrl)}" alt="" style="max-height: 56px; max-width: 200px; margin-bottom: 16px;" />` : ""}
+        <h1 style="color: #1a1a1a;">${paid ? "Payment confirmed!" : "You're in!"}</h1>
+        <p>Hi ${name}, you're now registered for <strong>${service}</strong>.</p>
+        ${receipt}
+        ${startsLater ? `<p>This service starts on <strong>${startsLater}</strong>.</p>` : ""}
+        <p>Sign in to ${appName} to access everything included in your registration.</p>
+        <a href="${appUrl}/student" style="display: inline-block; padding: 12px 24px; background: ${escapeHtml(input.buttonColor || "#6366f1")}; color: ${escapeHtml(readableTextColor(input.buttonColor || "#6366f1"))}; text-decoration: none; border-radius: 6px;">Go to my dashboard</a>
+      </div>
+    `,
+  };
+}
+
+export interface ServiceSaleNotificationInput {
+  creatorName: string;
+  learnerName: string;
+  learnerEmail: string;
+  serviceName: string;
+  amount?: number;
+  currency?: string;
+}
+
+/** Sent to the creator on every registration, free or paid. */
+export function serviceSaleNotificationEmail(input: ServiceSaleNotificationInput) {
+  const paid = (input.amount ?? 0) > 0;
+  const learner = escapeHtml(input.learnerName || "A learner");
+  const service = escapeHtml(input.serviceName);
+
+  return {
+    subject: paid ? `New purchase: ${input.serviceName}` : `New registration: ${input.serviceName}`,
+    html: `
+      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+        <h1 style="color: #1a1a1a;">${paid ? "New sale!" : "New registration!"}</h1>
+        <p>Hi ${escapeHtml(input.creatorName || "there")}, <strong>${learner}</strong> (${escapeHtml(input.learnerEmail)}) just ${
+          paid ? `purchased <strong>${service}</strong> for ${formatAmount(input.amount!, input.currency)}` : `registered for <strong>${service}</strong>`
+        }.</p>
+        <a href="${process.env.NEXT_PUBLIC_APP_URL}/creator/${paid ? "payments" : "customers"}" style="display: inline-block; padding: 12px 24px; background: #6366f1; color: white; text-decoration: none; border-radius: 6px;">${paid ? "View payments" : "View customers"}</a>
       </div>
     `,
   };

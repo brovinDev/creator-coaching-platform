@@ -1,5 +1,5 @@
-import { auth } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { auth, getNocodeToken } from "@/lib/auth";
+import { nocodeDb } from "@/lib/nocode/db";
 import { Card, CardContent } from "@/components/ui/card";
 import { CreditCard, CheckCircle, Clock, XCircle, IndianRupee } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
@@ -13,26 +13,30 @@ const statusConfig: Record<string, { label: string; color: string; icon: typeof 
 export default async function StudentPaymentsPage() {
   const session = await auth();
   const userId = session!.user.id;
+  const token = await getNocodeToken();
 
-  const orders = await db.order.findMany({
-    where: { userId },
-    include: {
-      course: {
-        select: { title: true, slug: true, thumbnail: true, creator: { select: { name: true } } },
-      },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const orders = await nocodeDb.orders.findMany({ where: { user_id: userId } }, token);
+  orders.sort(
+    (a, b) =>
+      new Date(String(b.created_at || b.createdAt || 0)).getTime() -
+      new Date(String(a.created_at || a.createdAt || 0)).getTime()
+  );
+
+  const courseIds = [...new Set(orders.map((o) => String(o.course_id)))];
+  const courseMap = new Map<string, Record<string, unknown>>();
+  for (const cid of courseIds) {
+    const course = await nocodeDb.courses.findUnique({ id: cid }, token);
+    if (course) courseMap.set(cid, course);
+  }
 
   const totalSpent = orders
     .filter((o) => o.status === "paid")
-    .reduce((sum, o) => sum + o.amount, 0);
+    .reduce((sum, o) => sum + Number(o.amount || 0), 0);
 
   return (
     <div>
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Payment History</h1>
 
-      {/* Summary cards */}
       <div className="grid gap-4 sm:grid-cols-3 mb-8">
         <Card>
           <CardContent className="pt-5 pb-5">
@@ -98,18 +102,19 @@ export default async function StudentPaymentsPage() {
               </thead>
               <tbody>
                 {orders.map((order) => {
-                  const config = statusConfig[order.status] || statusConfig.pending;
+                  const config = statusConfig[String(order.status)] || statusConfig.pending;
                   const StatusIcon = config.icon;
+                  const course = courseMap.get(String(order.course_id));
                   return (
-                    <tr key={order.id} className="hover:bg-gray-50 transition-colors">
+                    <tr key={String(order.id)} className="hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-4">
                         <div>
-                          <p className="font-medium text-gray-900 text-sm">{order.course.title}</p>
-                          <p className="text-xs text-gray-500">by {order.course.creator.name}</p>
+                          <p className="font-medium text-gray-900 text-sm">{String(course?.title || "")}</p>
+                          <p className="text-xs text-gray-500">by {String(course?.creator_name || "Creator")}</p>
                         </div>
                       </td>
                       <td className="px-4 py-4">
-                        <span className="font-semibold text-gray-900">{formatPrice(order.amount)}</span>
+                        <span className="font-semibold text-gray-900">{formatPrice(Number(order.amount))}</span>
                       </td>
                       <td className="px-4 py-4">
                         <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${config.color}`}>
@@ -118,7 +123,7 @@ export default async function StudentPaymentsPage() {
                         </span>
                       </td>
                       <td className="px-4 py-4 text-sm text-gray-500">
-                        {new Date(order.createdAt).toLocaleDateString("en-IN", {
+                        {new Date(String(order.created_at || order.createdAt || "")).toLocaleDateString("en-IN", {
                           day: "numeric",
                           month: "short",
                           year: "numeric",
@@ -126,7 +131,7 @@ export default async function StudentPaymentsPage() {
                       </td>
                       <td className="px-4 py-4">
                         <span className="text-xs text-gray-400 font-mono">
-                          {order.razorpayPaymentId || "—"}
+                          {String(order.razorpay_payment_id || "—")}
                         </span>
                       </td>
                     </tr>

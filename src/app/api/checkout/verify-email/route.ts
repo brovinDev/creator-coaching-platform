@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { nocodeDb } from "@/lib/nocode/db";
+
+const SYSTEM_TOKEN = process.env.NOCODE_SYSTEM_TOKEN || "";
 
 export async function POST(req: NextRequest) {
   try {
@@ -9,23 +11,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Email and OTP are required" }, { status: 400 });
     }
 
-    const record = await db.emailOtp.findFirst({
-      where: {
-        email,
-        otp,
-        verified: false,
-        expiresAt: { gt: new Date() },
-      },
-    });
+    const records = await nocodeDb.emailOtps.findMany(
+      { where: { email, otp, verified: false } },
+      SYSTEM_TOKEN
+    );
+
+    const record = records.find(
+      (r) => new Date(r.expires_at as string) > new Date()
+    );
 
     if (!record) {
       return NextResponse.json({ error: "Invalid or expired OTP" }, { status: 400 });
     }
 
-    await db.emailOtp.update({
-      where: { id: record.id },
-      data: { verified: true },
-    });
+    await nocodeDb.emailOtps.update(
+      String(record.id),
+      { verified: true },
+      SYSTEM_TOKEN
+    );
 
     return NextResponse.json({ message: "Email verified", verified: true });
   } catch (error) {

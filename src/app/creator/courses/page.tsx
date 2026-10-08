@@ -3,13 +3,10 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
-import { BookOpen, Plus, Users, Eye, EyeOff } from "lucide-react";
+import { BookOpen, Plus, Search, MoreHorizontal, X } from "lucide-react";
 import toast from "react-hot-toast";
-import { formatPrice } from "@/lib/utils";
 
 interface Course {
   id: string;
@@ -17,28 +14,61 @@ interface Course {
   slug: string;
   description: string;
   thumbnail: string | null;
-  price: number;
   published: boolean;
-  _count: { enrollments: number; modules: number };
+  creatorName: string;
+  _count: { sections: number; lectures: number };
+}
+
+interface ServiceOption {
+  id: string;
+  title: string;
+  slug: string;
+  course_id: string | null;
 }
 
 export default function CoursesPage() {
   const router = useRouter();
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [creating, setCreating] = useState(false);
+  const [menuOpen, setMenuOpen] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchCourses();
-  }, []);
+  const [services, setServices] = useState<ServiceOption[]>([]);
+  const [selectedServiceIds, setSelectedServiceIds] = useState<Set<string>>(new Set());
+  const [serviceSearch, setServiceSearch] = useState("");
+  const [showServiceDropdown, setShowServiceDropdown] = useState(false);
+
+  useEffect(() => { fetchCourses(); fetchServices(); }, []);
 
   async function fetchCourses() {
     const res = await fetch("/api/courses");
     const data = await res.json();
     setCourses(data);
     setLoading(false);
+  }
+
+  async function fetchServices() {
+    const res = await fetch("/api/services");
+    if (res.ok) {
+      const data = await res.json();
+      setServices(data.map((s: Record<string, unknown>) => ({
+        id: String(s.id),
+        title: String(s.title || ""),
+        slug: String(s.slug || ""),
+        course_id: s.course_id ? String(s.course_id) : null,
+      })));
+    }
+  }
+
+  function openCreateModal() {
+    setShowCreate(true);
+    setNewTitle("");
+    setSelectedServiceIds(new Set());
+    setServiceSearch("");
+    fetchServices();
   }
 
   async function createCourse() {
@@ -51,6 +81,23 @@ export default function CoursesPage() {
         body: JSON.stringify({ title: newTitle }),
       });
       const course = await res.json();
+
+      if (selectedServiceIds.size > 0) {
+        for (const sid of selectedServiceIds) {
+          const svcRes = await fetch(`/api/services/${sid}`);
+          const svc = svcRes.ok ? await svcRes.json() : null;
+          const existing = svc?.course_id ? String(svc.course_id).split(",").filter(Boolean).map((s: string) => s.trim()) : [];
+          if (!existing.includes(String(course.id))) {
+            existing.push(String(course.id));
+          }
+          await fetch(`/api/services/${sid}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ course_id: existing.join(",") }),
+          });
+        }
+      }
+
       toast.success("Course created!");
       setShowCreate(false);
       setNewTitle("");
@@ -62,6 +109,61 @@ export default function CoursesPage() {
     }
   }
 
+  function toggleService(id: string) {
+    setSelectedServiceIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+    setShowServiceDropdown(false);
+    setServiceSearch("");
+  }
+
+  async function togglePublish(course: Course) {
+    setMenuOpen(null);
+    try {
+      const res = await fetch(`/api/courses/${course.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ published: !course.published }),
+      });
+      if (res.ok) {
+        toast.success(course.published ? "Course unpublished" : "Course published");
+        fetchCourses();
+      } else {
+        toast.error("Failed to update course");
+      }
+    } catch {
+      toast.error("Failed to update course");
+    }
+  }
+
+  async function deleteCourse(course: Course) {
+    setMenuOpen(null);
+    if (!confirm(`Delete "${course.title}"? This cannot be undone.`)) return;
+    try {
+      const res = await fetch(`/api/courses/${course.id}`, { method: "DELETE" });
+      if (res.ok) {
+        toast.success("Course deleted");
+        fetchCourses();
+      } else {
+        toast.error("Failed to delete course");
+      }
+    } catch {
+      toast.error("Failed to delete course");
+    }
+  }
+
+  const filtered = courses.filter(
+    (c) =>
+      c.title.toLowerCase().includes(search.toLowerCase()) ||
+      (c.description || "").toLowerCase().includes(search.toLowerCase())
+  );
+
+  const filteredServices = services.filter(
+    (s) => s.title.toLowerCase().includes(serviceSearch.toLowerCase())
+  );
+
   if (loading) {
     return <div className="flex items-center justify-center py-20 text-gray-400">Loading...</div>;
   }
@@ -70,9 +172,9 @@ export default function CoursesPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Courses</h1>
-        <Button onClick={() => setShowCreate(true)}>
+        <Button onClick={openCreateModal}>
           <Plus className="h-4 w-4" />
-          Create Course
+          Create
         </Button>
       </div>
 
@@ -80,76 +182,216 @@ export default function CoursesPage() {
         <EmptyState
           icon={BookOpen}
           title="No courses yet"
-          description="Create your first course to start teaching and earning."
+          description="Create your first course to start teaching."
           actionLabel="Create Course"
-          onAction={() => setShowCreate(true)}
+          onAction={openCreateModal}
         />
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {courses.map((course) => (
-            <Card
-              key={course.id}
-              className="cursor-pointer hover:shadow-md hover:border-indigo-200 transition-all"
-              onClick={() => router.push(`/creator/courses/${course.id}`)}
-            >
-              <div className="aspect-video bg-gray-100 rounded-t-xl flex items-center justify-center">
-                {course.thumbnail ? (
-                  <img src={course.thumbnail} alt={course.title} className="w-full h-full object-cover rounded-t-xl" />
-                ) : (
-                  <BookOpen className="h-10 w-10 text-gray-300" />
-                )}
-              </div>
-              <CardContent className="pt-4">
-                <div className="flex items-start justify-between gap-2">
-                  <h3 className="font-semibold text-gray-900 line-clamp-1">{course.title}</h3>
-                  {course.published ? (
-                    <span className="shrink-0 inline-flex items-center gap-1 text-xs text-green-700 bg-green-50 px-2 py-0.5 rounded-full">
-                      <Eye className="h-3 w-3" /> Live
-                    </span>
+        <>
+          <div className="flex items-center gap-3 mb-6">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="search by course title or description"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              />
+            </div>
+            <select className="px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-700 bg-white focus:outline-none">
+              <option>Course</option>
+            </select>
+          </div>
+
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {filtered.map((course) => (
+              <div key={course.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-md transition-shadow">
+                <div className="aspect-video bg-gray-900 flex items-center justify-center">
+                  {course.thumbnail ? (
+                    <img src={course.thumbnail} alt={course.title} className="w-full h-full object-cover" />
                   ) : (
-                    <span className="shrink-0 inline-flex items-center gap-1 text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
-                      <EyeOff className="h-3 w-3" /> Draft
-                    </span>
+                    <BookOpen className="h-12 w-12 text-gray-600" />
                   )}
                 </div>
-                <div className="flex items-center gap-4 mt-3 text-sm text-gray-500">
-                  <span className="flex items-center gap-1">
-                    <Users className="h-4 w-4" /> {course._count.enrollments} students
-                  </span>
-                  <span>{course._count.modules} modules</span>
+                <div className="p-4">
+                  <div className="flex justify-end mb-1">
+                    {course.published ? (
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-white bg-green-600 px-2 py-0.5 rounded">
+                        Published
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 bg-gray-200 px-2 py-0.5 rounded">
+                        Draft
+                      </span>
+                    )}
+                  </div>
+                  <h3 className="font-semibold text-gray-900 line-clamp-2 leading-snug">{course.title}</h3>
+                  <p className="text-sm text-gray-500 mt-1">{course.creatorName}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {course._count.sections} sections &middot; {course._count.lectures} lectures
+                  </p>
+                  <div className="flex items-center gap-2 mt-3">
+                    <button
+                      onClick={() => router.push(`/creator/courses/${course.id}`)}
+                      className="flex-1 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+                    >
+                      Edit course
+                    </button>
+                    <div className="relative">
+                      <button
+                        onClick={() => setMenuOpen(menuOpen === course.id ? null : course.id)}
+                        className="p-2 text-gray-400 hover:text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+                      >
+                        <MoreHorizontal className="h-4 w-4" />
+                      </button>
+                      {menuOpen === course.id && (
+                        <>
+                          <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(null)} />
+                          <div className="absolute right-0 bottom-full mb-1 w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-20 py-2">
+                            <button
+                              onClick={() => { setMenuOpen(null); router.push(`/preview/courses/${course.id}`); }}
+                              className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
+                            >
+                              View as customer
+                            </button>
+                            <button
+                              onClick={() => { setMenuOpen(null); router.push(`/creator/courses/${course.id}`); }}
+                              className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
+                            >
+                              Course overview
+                            </button>
+                            <button
+                              onClick={() => { setMenuOpen(null); toast("Clone coming soon"); }}
+                              className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
+                            >
+                              Clone course
+                            </button>
+                            <button
+                              onClick={() => togglePublish(course)}
+                              className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
+                            >
+                              {course.published ? "Unpublish" : "Publish"}
+                            </button>
+                            <button
+                              onClick={() => deleteCourse(course)}
+                              className="w-full text-left px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 cursor-pointer"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                <p className="mt-2 text-sm font-semibold text-indigo-600">
-                  {course.price > 0 ? formatPrice(course.price) : "Free"}
-                </p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+              </div>
+            ))}
+          </div>
+        </>
       )}
 
-      <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Create Course">
+      <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Create new course">
+        <div className="flex flex-col items-center">
+          <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center mb-5">
+            <BookOpen className="h-7 w-7 text-gray-800" />
+          </div>
+          <h3 className="text-base font-bold text-gray-900">How about a working title?</h3>
+          <p className="text-sm text-gray-400 mt-1 text-center leading-relaxed mb-6">
+            {"It's ok if you can't think of a good title now. You can"}<br />{"change it later."}
+          </p>
+        </div>
         <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            createCourse();
-          }}
-          className="space-y-4"
+          onSubmit={(e) => { e.preventDefault(); createCourse(); }}
+          className="space-y-0"
         >
-          <Input
-            id="title"
-            label="Course Title"
-            placeholder="e.g., React Masterclass"
-            value={newTitle}
-            onChange={(e) => setNewTitle(e.target.value)}
-            required
-          />
-          <div className="flex justify-end gap-3">
-            <Button variant="outline" type="button" onClick={() => setShowCreate(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" loading={creating}>
-              Create
-            </Button>
+          <div className="relative border-b border-gray-200 py-1">
+            <input
+              type="text"
+              placeholder="e.g. Learn Aquascaping from Scratch"
+              value={newTitle}
+              onChange={(e) => { if (e.target.value.length <= 100) setNewTitle(e.target.value); }}
+              maxLength={100}
+              required
+              className="w-full px-1 py-2.5 text-sm focus:outline-none pr-10 bg-transparent placeholder:text-gray-400"
+            />
+            <span className="absolute right-1 top-1/2 -translate-y-1/2 text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">
+              {100 - newTitle.length}
+            </span>
+          </div>
+
+          {/* Link services */}
+          <div className="relative border-b border-gray-200 py-1">
+            <div
+              className="w-full px-1 py-2.5 text-sm cursor-pointer flex items-center gap-2 flex-wrap min-h-[42px]"
+              onClick={() => setShowServiceDropdown(!showServiceDropdown)}
+            >
+              {selectedServiceIds.size === 0 ? (
+                <span className="text-gray-400">Link services to this course</span>
+              ) : (
+                <>
+                  {Array.from(selectedServiceIds).map((sid) => {
+                    const svc = services.find((s) => s.id === sid);
+                    return svc ? (
+                      <span key={sid} className="inline-flex items-center gap-1 bg-gray-100 text-gray-700 text-xs font-medium px-2 py-1 rounded">
+                        {svc.title}
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); toggleService(sid); }}
+                          className="cursor-pointer"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    ) : null;
+                  })}
+                </>
+              )}
+            </div>
+
+            {showServiceDropdown && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 max-h-48 overflow-y-auto">
+                <div className="p-2 border-b border-gray-100">
+                  <input
+                    type="text"
+                    placeholder="Search services..."
+                    value={serviceSearch}
+                    onChange={(e) => setServiceSearch(e.target.value)}
+                    className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-gray-400"
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </div>
+                {filteredServices.length === 0 ? (
+                  <div className="px-4 py-3 text-sm text-gray-400">No services found</div>
+                ) : (
+                  filteredServices.map((svc) => (
+                    <button
+                      key={svc.id}
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); toggleService(svc.id); }}
+                      className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 transition-colors cursor-pointer flex items-center justify-between ${
+                        selectedServiceIds.has(svc.id) ? "bg-gray-100 text-gray-900 font-medium" : "text-gray-700"
+                      }`}
+                    >
+                      <span>{svc.title}</span>
+                      {selectedServiceIds.has(svc.id) && (
+                        <span className="text-gray-500 text-xs">&#10003;</span>
+                      )}
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="pt-5">
+            <button
+              type="submit"
+              disabled={creating || !newTitle.trim()}
+              className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold transition-colors disabled:opacity-40 cursor-pointer"
+            >
+              {creating ? "Creating..." : "Continue"}
+            </button>
           </div>
         </form>
       </Modal>

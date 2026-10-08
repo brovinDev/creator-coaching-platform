@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { upload } from "@/lib/upload";
+import { uploadMedia } from "@/lib/upload";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -11,23 +11,13 @@ export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
-    const type = formData.get("type") as string | null;
 
     if (!file) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
-    const buffer = Buffer.from(await file.arrayBuffer());
     const filename = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
-
-    let result;
-    if (type === "video") {
-      result = await upload.uploadVideo(buffer, filename);
-    } else {
-      result = await upload.uploadImage(buffer, filename);
-    }
-
-    return NextResponse.json(result);
+    return NextResponse.json(await uploadMedia(file, filename, session.user.id));
   } catch (error) {
     console.error("Upload error:", error);
     return NextResponse.json({ error: "Upload failed" }, { status: 500 });

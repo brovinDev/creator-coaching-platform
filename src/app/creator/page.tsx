@@ -1,39 +1,34 @@
-import { auth } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { auth, getNocodeToken } from "@/lib/auth";
+import { nocodeDb } from "@/lib/nocode/db";
 import { Card, CardContent } from "@/components/ui/card";
 import { BookOpen, Users, CreditCard, FileText } from "lucide-react";
 
 export default async function CreatorDashboard() {
   const session = await auth();
   const userId = session!.user.id;
+  const token = await getNocodeToken();
 
-  const [courseCount, enrollmentCount, totalRevenue, landingPageCount] = await Promise.all([
-    db.course.count({ where: { creatorId: userId } }),
-    db.enrollment.count({
-      where: { course: { creatorId: userId } },
-    }),
-    db.order.aggregate({
-      where: { course: { creatorId: userId }, status: "paid" },
-      _sum: { amount: true },
-    }),
-    db.landingPage.count({
-      where: { course: { creatorId: userId } },
-    }),
+  const [courses, enrollments, orders, landingPages] = await Promise.all([
+    nocodeDb.courses.findMany({ where: { creator_id: userId } }, token),
+    nocodeDb.enrollments.findMany({}, token),
+    nocodeDb.orders.findMany({ where: { status: "paid" } }, token),
+    nocodeDb.landingPages.findMany({}, token),
   ]);
 
+  const courseIds = new Set(courses.map((c) => String(c.id)));
+  const myEnrollments = enrollments.filter((e) => courseIds.has(String(e.course_id)));
+  const myOrders = orders.filter((o) => courseIds.has(String(o.course_id)));
+  const myLandingPages = landingPages.filter((lp) => courseIds.has(String(lp.course_id)));
+  const totalRevenue = myOrders.reduce((sum, o) => sum + Number(o.amount || 0), 0);
+
   const stats = [
-    { label: "Courses", value: courseCount, icon: BookOpen, color: "bg-blue-50 text-blue-600" },
-    { label: "Students", value: enrollmentCount, icon: Users, color: "bg-green-50 text-green-600" },
-    { label: "Revenue", value: `₹${totalRevenue._sum.amount || 0}`, icon: CreditCard, color: "bg-purple-50 text-purple-600" },
-    { label: "Landing Pages", value: landingPageCount, icon: FileText, color: "bg-orange-50 text-orange-600" },
+    { label: "Courses", value: courses.length, icon: BookOpen, color: "bg-blue-50 text-blue-600" },
+    { label: "Students", value: myEnrollments.length, icon: Users, color: "bg-green-50 text-green-600" },
+    { label: "Revenue", value: `₹${totalRevenue}`, icon: CreditCard, color: "bg-purple-50 text-purple-600" },
+    { label: "Landing Pages", value: myLandingPages.length, icon: FileText, color: "bg-orange-50 text-orange-600" },
   ];
 
-  const recentOrders = await db.order.findMany({
-    where: { course: { creatorId: userId }, status: "paid" },
-    include: { user: { select: { name: true, email: true } }, course: { select: { title: true } } },
-    orderBy: { createdAt: "desc" },
-    take: 5,
-  });
+  const recentOrders = myOrders.slice(0, 5);
 
   return (
     <div>
@@ -65,12 +60,12 @@ export default async function CreatorDashboard() {
           ) : (
             <div>
               {recentOrders.map((order) => (
-                <div key={order.id} className="flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors">
+                <div key={String(order.id)} className="flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors">
                   <div>
-                    <p className="text-sm font-medium text-gray-900">{order.user.name}</p>
-                    <p className="text-xs text-gray-500">{order.course.title}</p>
+                    <p className="text-sm font-medium text-gray-900">{String(order.user_name || "Student")}</p>
+                    <p className="text-xs text-gray-500">{String(order.course_title || "")}</p>
                   </div>
-                  <p className="text-sm font-semibold text-green-600">₹{order.amount}</p>
+                  <p className="text-sm font-semibold text-green-600">₹{Number(order.amount)}</p>
                 </div>
               ))}
             </div>

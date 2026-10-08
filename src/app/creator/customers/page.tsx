@@ -1,32 +1,38 @@
-import { auth } from "@/lib/auth";
-import { db } from "@/lib/db";
-import { Card, CardContent } from "@/components/ui/card";
+import { auth, getNocodeToken } from "@/lib/auth";
+import { nocodeDb } from "@/lib/nocode/db";
+import { Card } from "@/components/ui/card";
 import { Users } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 
 export default async function CustomersPage() {
   const session = await auth();
+  const token = await getNocodeToken();
 
-  const enrollments = await db.enrollment.findMany({
-    where: { course: { creatorId: session!.user.id } },
-    include: {
-      user: { select: { id: true, name: true, email: true, createdAt: true } },
-      course: { select: { title: true } },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const courses = await nocodeDb.courses.findMany(
+    { where: { creator_id: session!.user.id } },
+    token
+  );
+  const courseIds = new Set(courses.map((c) => String(c.id)));
+  const courseMap = new Map(courses.map((c) => [String(c.id), c]));
 
-  const uniqueStudents = new Map<string, { name: string; email: string; courses: string[]; enrolledAt: Date }>();
+  const allEnrollments = await nocodeDb.enrollments.findMany({}, token);
+  const enrollments = allEnrollments.filter((e) => courseIds.has(String(e.course_id)));
+
+  const uniqueStudents = new Map<
+    string,
+    { name: string; email: string; courses: string[] }
+  >();
   for (const e of enrollments) {
-    const existing = uniqueStudents.get(e.user.id);
+    const uid = String(e.user_id);
+    const course = courseMap.get(String(e.course_id));
+    const existing = uniqueStudents.get(uid);
     if (existing) {
-      existing.courses.push(e.course.title);
+      existing.courses.push(String(course?.title || ""));
     } else {
-      uniqueStudents.set(e.user.id, {
-        name: e.user.name,
-        email: e.user.email,
-        courses: [e.course.title],
-        enrolledAt: e.createdAt,
+      uniqueStudents.set(uid, {
+        name: String(e.user_name || "Student"),
+        email: String(e.user_email || ""),
+        courses: [String(course?.title || "")],
       });
     }
   }

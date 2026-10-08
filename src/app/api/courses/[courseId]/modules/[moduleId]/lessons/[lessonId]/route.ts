@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { auth, getNocodeToken } from "@/lib/auth";
+import { nocodeDb } from "@/lib/nocode/db";
 
 type Params = { params: Promise<{ courseId: string; moduleId: string; lessonId: string }> };
 
@@ -11,21 +11,31 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const course = await db.course.findUnique({ where: { id: courseId, creatorId: session.user.id } });
+  const token = await getNocodeToken();
+  const course = await nocodeDb.courses.findUnique({ id: courseId, creator_id: session.user.id }, token);
   if (!course) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const data = await req.json();
-  const updated = await db.lesson.update({
-    where: { id: lessonId },
-    data: {
-      ...(data.title !== undefined && { title: data.title }),
-      ...(data.content !== undefined && { content: data.content }),
-      ...(data.videoUrl !== undefined && { videoUrl: data.videoUrl }),
-      ...(data.thumbnail !== undefined && { thumbnail: data.thumbnail }),
-    },
-  });
+  const updateFields: Record<string, unknown> = {};
+  if (data.title !== undefined) updateFields.title = data.title;
+  if (data.content !== undefined) updateFields.content = data.content;
+  if (data.videoUrl !== undefined) updateFields.video_url = data.videoUrl;
+  if (data.thumbnail !== undefined) updateFields.thumbnail = data.thumbnail;
+  if (data.resources !== undefined) updateFields.resources = data.resources;
+  if (data.position !== undefined) updateFields.position = data.position;
 
-  return NextResponse.json(updated);
+  const updated = await nocodeDb.lessons.update(lessonId, updateFields, token);
+
+  return NextResponse.json({
+    id: updated.id ?? lessonId,
+    title: updated.title,
+    content: updated.content,
+    videoUrl: updated.video_url,
+    thumbnail: updated.thumbnail,
+    position: updated.position,
+    moduleId: updated.module_id,
+    resources: updated.resources,
+  });
 }
 
 export async function DELETE(req: NextRequest, { params }: Params) {
@@ -35,9 +45,10 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const course = await db.course.findUnique({ where: { id: courseId, creatorId: session.user.id } });
+  const token = await getNocodeToken();
+  const course = await nocodeDb.courses.findUnique({ id: courseId, creator_id: session.user.id }, token);
   if (!course) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  await db.lesson.delete({ where: { id: lessonId } });
+  await nocodeDb.lessons.delete(lessonId, token);
   return NextResponse.json({ message: "Deleted" });
 }
