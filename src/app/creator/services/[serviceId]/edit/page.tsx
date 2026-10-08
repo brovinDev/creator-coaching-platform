@@ -8,6 +8,9 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { RichTextEditor } from "@/components/rich-text-editor";
+import { RichTextContent } from "@/components/rich-text-content";
+import { toEditorHtml } from "@/lib/rich-text-client";
 import {
   ArrowLeft, Upload, ImageIcon, Loader2, Trash2, Check,
   Plus, X, ChevronDown, ChevronUp, Copy,
@@ -109,7 +112,7 @@ export default function EditServicePage() {
         if (!serviceRes.ok) throw new Error("Not found");
         const data = await serviceRes.json();
         setTitle(data.title || "");
-        setDescription(data.description || "");
+        setDescription(toEditorHtml(data.description));
         setCoverImage(data.cover_image || "");
         setServiceType(data.service_type || "one-time");
         setEnableGst(!!data.enable_gst);
@@ -460,7 +463,7 @@ export default function EditServicePage() {
             </div>
           )}
           {description && (
-            <p className="mt-3 text-xs text-gray-600 whitespace-pre-line">{description}</p>
+            <RichTextContent html={description} className="mt-3 text-xs text-gray-600 whitespace-pre-line" />
           )}
           <p className="mt-4 text-[10px] text-gray-400 leading-tight">
             You agree to share information entered on this page with {APP_NAME} (owner of this page) and Razorpay, adhering to applicable laws.
@@ -563,7 +566,7 @@ export default function EditServicePage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Service description</label>
-                <Textarea placeholder="Add Service description here..." value={description} onChange={(e) => setDescription(e.target.value)} className="min-h-[160px]" />
+                <RichTextEditor placeholder="Add Service description here..." value={description} onChange={setDescription} />
               </div>
 
               <div>

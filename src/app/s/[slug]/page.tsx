@@ -6,6 +6,8 @@ import type { Metadata } from "next";
 import { getBranding } from "@/lib/branding";
 import { buttonStyle } from "@/lib/branding-colors";
 import { ThemeScope } from "@/components/theme-scope";
+import { RichTextContent } from "@/components/rich-text-content";
+import { sanitizeRichText, richTextToPlain } from "@/lib/rich-text";
 
 const SYSTEM_TOKEN = process.env.NOCODE_SYSTEM_TOKEN || "";
 const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME || "Open Slate";
@@ -21,7 +23,7 @@ export async function generateMetadata({
 
   const branding = await getBranding(String(service.creator_id));
   const title = branding.previewTitle || String(service.title || "") || branding.brandName;
-  const description = branding.previewDescription || String(service.description || "").slice(0, 150);
+  const description = branding.previewDescription || richTextToPlain(String(service.description || "")).slice(0, 150);
   const image = branding.previewImageUrl || String(service.cover_image || "");
   return {
     title,
@@ -81,7 +83,7 @@ export default async function ServicePreviewPage({
   }
 
   const serviceTitle = String(service.title || "");
-  const serviceDescription = String(service.description || "");
+  const serviceDescription = sanitizeRichText(String(service.description || ""));
   const coverImage = String(service.cover_image || "") || firstCourseThumbnail;
   const serviceSlug = String(service.slug || slug);
   const checkoutUrl = `/checkout/${serviceSlug}`;
@@ -123,9 +125,10 @@ export default async function ServicePreviewPage({
         )}
 
         {serviceDescription && (
-          <div className="mt-6 text-gray-700 text-base leading-relaxed whitespace-pre-line">
-            {serviceDescription}
-          </div>
+          <RichTextContent
+            html={serviceDescription}
+            className="mt-6 text-gray-700 text-base leading-relaxed whitespace-pre-line"
+          />
         )}
       </div>
 

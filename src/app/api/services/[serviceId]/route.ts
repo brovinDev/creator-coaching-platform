@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth, getNocodeToken } from "@/lib/auth";
 import { nocodeDb } from "@/lib/nocode/db";
+import { sanitizeRichText } from "@/lib/rich-text";
 
 export async function GET(
   _req: NextRequest,
@@ -61,6 +62,7 @@ export async function PUT(
   for (const field of allowedFields) {
     if (field in body) updates[field] = body[field];
   }
+  if ("description" in updates) updates.description = sanitizeRichText(updates.description as string);
 
   try {
     const updated = await nocodeDb.services.update(serviceId, updates, token);

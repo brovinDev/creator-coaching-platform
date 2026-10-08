@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { nocodeDb } from "@/lib/nocode/db";
 import { getBranding } from "@/lib/branding";
+import { sanitizeRichText } from "@/lib/rich-text";
 
 const SYSTEM_TOKEN = process.env.NOCODE_SYSTEM_TOKEN || "";
 
@@ -33,7 +34,7 @@ export async function GET(
   return NextResponse.json({
     id: service.id,
     title: service.title,
-    description: service.description,
+    description: sanitizeRichText(service.description as string),
     cover_image: service.cover_image,
     service_type: service.service_type,
     price: service.price,

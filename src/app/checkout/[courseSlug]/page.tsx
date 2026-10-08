@@ -10,6 +10,7 @@ import {
   ArrowLeft, Plus, Mail, CheckCircle, LogIn, X,
 } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
+import { RichTextContent } from "@/components/rich-text-content";
 import { buttonStyle } from "@/lib/branding-colors";
 import { ThemeScope } from "@/components/theme-scope";
 import toast from "react-hot-toast";
@@ -342,9 +343,10 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
                 )}
 
                 {service.description && (
-                  <div className="mt-6 text-gray-700 text-sm leading-relaxed whitespace-pre-line">
-                    {service.description}
-                  </div>
+                  <RichTextContent
+                    html={service.description}
+                    className="mt-6 text-gray-700 text-sm leading-relaxed whitespace-pre-line"
+                  />
                 )}
               </div>
             </div>

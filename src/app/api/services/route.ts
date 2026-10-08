@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth, getNocodeToken } from "@/lib/auth";
 import { nocodeDb } from "@/lib/nocode/db";
 import { slugify } from "@/lib/utils";
+import { sanitizeRichText } from "@/lib/rich-text";
 
 export async function GET() {
   const session = await auth();
@@ -70,7 +71,7 @@ export async function POST(req: NextRequest) {
     {
       title,
       slug,
-      description: body.description || "",
+      description: sanitizeRichText(body.description),
       cover_image: body.cover_image || null,
       service_type,
       status: "ACTIVE",
