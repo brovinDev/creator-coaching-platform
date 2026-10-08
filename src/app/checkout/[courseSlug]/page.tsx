@@ -224,7 +224,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
       const res = await fetch("/api/coupons/validate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: couponCode, serviceId: service?.kind === "service" ? service.id : undefined }),
+        body: JSON.stringify({ code: couponCode.trim(), serviceId: service?.kind === "service" ? service.id : undefined }),
       });
       const data = await res.json();
       if (res.ok && data.valid) {

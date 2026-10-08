@@ -19,7 +19,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   const body = await req.json();
   const updateFields: Record<string, unknown> = {};
-  if (body.code !== undefined) updateFields.code = body.code.toUpperCase();
+  if (body.code !== undefined) updateFields.code = body.code.trim().toUpperCase();
   if (body.service_id !== undefined) updateFields.service_id = body.service_id;
   if (body.discount_type !== undefined) updateFields.discount_type = body.discount_type;
   if (body.discount_value !== undefined) updateFields.discount_value = Number(body.discount_value);

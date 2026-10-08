@@ -5,7 +5,8 @@ import { nocodeDb } from "@/lib/nocode/db";
 const SYSTEM_TOKEN = process.env.NOCODE_SYSTEM_TOKEN || "";
 
 export async function POST(req: NextRequest) {
-  const { code, serviceId } = await req.json();
+  const { code: rawCode, serviceId } = await req.json();
+  const code = typeof rawCode === "string" ? rawCode.trim() : "";
   const session = await auth();
 
   if (!code) {
