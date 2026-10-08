@@ -1,6 +1,7 @@
 import { createHash, timingSafeEqual } from "crypto";
 import { after, NextRequest, NextResponse } from "next/server";
 import { runWorkshopReminders } from "@/lib/workshop-reminders";
+import { reconcilePendingOrders } from "@/lib/reconcile-orders";
 
 const digest = (value: string) => createHash("sha256").update(value).digest();
 
@@ -25,6 +26,15 @@ export async function POST(req: NextRequest) {
       if (result.due > 0) console.log("[workshop-reminders]", JSON.stringify(result));
     } catch (error) {
       console.error("[workshop-reminders] run failed", error);
+    }
+    // Every 5 minutes: complete orders that were paid at Razorpay but never confirmed here.
+    try {
+      if (new Date().getMinutes() % 5 === 0) {
+        const reconciled = await reconcilePendingOrders();
+        if (reconciled.completed > 0) console.log("[reconcile-orders]", JSON.stringify(reconciled));
+      }
+    } catch (error) {
+      console.error("[reconcile-orders] run failed", error);
     }
   });
   return NextResponse.json({ queued: true }, { status: 202 });

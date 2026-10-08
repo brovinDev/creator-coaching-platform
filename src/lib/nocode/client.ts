@@ -300,6 +300,31 @@ export async function getPaymentByOrderId(orderId: string): Promise<RecordedPaym
   }
 }
 
+export interface ProviderPayment {
+  id: string;
+  /** In the smallest currency unit (paise). */
+  amount: number;
+  currency: string;
+  /** "succeeded" once Razorpay has captured it. */
+  status: string;
+  /** For a payment id: the order it was paid against. */
+  orderId?: string;
+}
+
+/**
+ * Asks Razorpay (through the backend, with the keys connected there) about a payment or order by id.
+ * Unlike getPaymentByOrderId this does not wait for the webhook. Null when it cannot be found.
+ */
+export async function getRazorpayPayment(id: string, token: string): Promise<ProviderPayment | null> {
+  try {
+    const res = await request<{ payment?: ProviderPayment }>(`/api/payments/${encodeURIComponent(id)}`, { token });
+    return res.payment ?? null;
+  } catch (error) {
+    if (error instanceof NocodeApiError && error.status === 404) return null;
+    throw error;
+  }
+}
+
 // ------------------------------------------------------------------
 // Helpers
 // ------------------------------------------------------------------
