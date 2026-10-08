@@ -115,7 +115,7 @@ export default function WebinarPagesPage() {
           >
             <RefreshCw className="h-4 w-4" />
           </button>
-          <Button onClick={create} loading={creating} className="bg-gray-900 hover:bg-black">
+          <Button onClick={create} loading={creating}>
             <Plus className="h-4 w-4" /> Create new page
           </Button>
         </div>
