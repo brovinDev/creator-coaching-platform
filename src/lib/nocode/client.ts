@@ -326,6 +326,48 @@ export async function getRazorpayPayment(id: string, token: string): Promise<Pro
 }
 
 // ------------------------------------------------------------------
+// Recurring payments (Razorpay Subscriptions, through the backend)
+// ------------------------------------------------------------------
+
+export interface ProviderSubscription {
+  id: string;
+  /** created, authenticated, active, pending, halted, cancelled, completed, expired or paused. */
+  status: string;
+  paidCount: number;
+  /** Unix seconds: the end of the period already paid for. */
+  currentEnd: number | null;
+  payments: { paymentId: string; amountPaise: number; paidAt: number | null }[];
+}
+
+/** One Razorpay plan: a price at a billing interval. Returns its id. */
+export async function createRazorpayPlan(
+  data: { name: string; amountPaise: number; interval: string; notes?: Record<string, string> },
+  token: string
+) {
+  const res = await request<{ planId: string }>("/api/open-slate/plans", { method: "POST", body: data, token });
+  return res.planId;
+}
+
+export async function createRazorpaySubscription(
+  data: { planId: string; totalCount: number; notes?: Record<string, string> },
+  token: string
+) {
+  return request<{ subscriptionId: string; keyId: string }>("/api/open-slate/subscriptions", { method: "POST", body: data, token });
+}
+
+export async function getRazorpaySubscription(id: string, token: string) {
+  return request<ProviderSubscription>(`/api/open-slate/subscriptions/${encodeURIComponent(id)}`, { token });
+}
+
+export async function cancelRazorpaySubscription(id: string, token: string) {
+  return request<{ status: string }>(`/api/open-slate/subscriptions/${encodeURIComponent(id)}/cancel`, {
+    method: "POST",
+    body: { atCycleEnd: true },
+    token,
+  });
+}
+
+// ------------------------------------------------------------------
 // Helpers
 // ------------------------------------------------------------------
 

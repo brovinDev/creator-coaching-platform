@@ -41,6 +41,7 @@ export async function GET(
     description: service.description,
     cover_image: service.cover_image,
     service_type: service.service_type,
+    billing_interval: service.billing_interval ?? null,
     price: service.price,
     discounted_price: service.discounted_price,
     currency: service.currency,

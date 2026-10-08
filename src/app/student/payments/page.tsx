@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { CreditCard, CheckCircle, Clock, XCircle, IndianRupee } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
 import { orderTitle } from "@/lib/orders";
+import { SubscriptionList } from "@/components/student/subscription-list";
 
 const statusConfig: Record<string, { label: string; color: string; icon: typeof CheckCircle }> = {
   paid: { label: "Paid", color: "text-green-700 bg-green-50", icon: CheckCircle },
@@ -42,6 +43,8 @@ export default async function StudentPaymentsPage() {
   return (
     <div>
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Payment History</h1>
+
+      <SubscriptionList />
 
       <div className="grid gap-4 sm:grid-cols-3 mb-8">
         <Card>

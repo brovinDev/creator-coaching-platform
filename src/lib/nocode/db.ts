@@ -34,6 +34,7 @@ export const MODULES = {
   feed_replies: "feed_replies",
   workshops: "workshops",
   funnels: "funnels",
+  service_subscriptions: "service_subscriptions",
   workshop_reminders: "workshop_reminders",
   creator_reminder_templates: "creator_reminder_templates",
 } as const;
@@ -159,6 +160,7 @@ export const nocodeDb = {
   feedComments: new NocodeModel(MODULES.feed_replies),
   workshops: new NocodeModel(MODULES.workshops),
   funnels: new NocodeModel(MODULES.funnels),
+  serviceSubscriptions: new NocodeModel(MODULES.service_subscriptions),
   workshopReminders: new NocodeModel(MODULES.workshop_reminders),
   creatorReminderTemplates: new NocodeModel(MODULES.creator_reminder_templates),
 };
