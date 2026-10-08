@@ -167,7 +167,7 @@ function ServiceSelect({
     return () => document.removeEventListener("mousedown", onDown);
   }, [open]);
 
-  const chosen = selected.map((id) => services.find((s) => s.id === id)).filter(Boolean) as ServiceOption[];
+  const chosen = [...new Set(selected)].map((id) => services.find((s) => s.id === id)).filter(Boolean) as ServiceOption[];
   const shown = services.filter((s) => s.title.toLowerCase().includes(query.trim().toLowerCase()));
 
   return (
@@ -267,7 +267,8 @@ export function WorkshopDrawer({
   useEffect(() => {
     fetch("/api/services")
       .then((r) => (r.ok ? r.json() : []))
-      .then((list: ServiceOption[]) => setServices(Array.isArray(list) ? list : []))
+      // The backend numbers services; the linked ids come back as text, so compare them as text.
+      .then((list: ServiceOption[]) => setServices(Array.isArray(list) ? list.map((s) => ({ ...s, id: String(s.id) })) : []))
       .catch(() => {});
   }, []);
 

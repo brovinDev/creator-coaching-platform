@@ -34,8 +34,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ worksho
     recurring: s.recurring,
     recurrenceDays: s.recurrence_days,
     recurrenceEnd: s.recurrence_end,
-    serviceIds: idList(w.service_ids),
-    excludeServiceIds: idList(w.exclude_service_ids),
+    // Older saves can hold the same service more than once.
+    serviceIds: [...new Set(idList(w.service_ids))],
+    excludeServiceIds: [...new Set(idList(w.exclude_service_ids))],
     upsellServiceId: String(w.upsell_service_id || ""),
   });
 }

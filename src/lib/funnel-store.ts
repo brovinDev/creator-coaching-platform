@@ -20,6 +20,7 @@ export interface Funnel {
   slug: string;
   theme: ThemeId;
   serviceId: string;
+  workshopId: string;
   published: boolean;
   content: LandingContent;
   thanks: ThanksContent;
@@ -33,6 +34,7 @@ export function toFunnel(row: Row): Funnel {
     slug: String(row.slug || ""),
     theme: isTheme(row.theme) ? row.theme : DEFAULT_THEME,
     serviceId: row.service_id ? String(row.service_id) : "",
+    workshopId: row.workshop_id ? String(row.workshop_id) : "",
     published: row.published === true || row.published === "true",
     content: parseJson(row.content, cleanContent),
     thanks: row.thanks ? parseJson(row.thanks, cleanThanks) : defaultThanks(),

@@ -89,6 +89,20 @@ export function StringList({ items, max, onChange, addLabel, placeholder }: { it
   );
 }
 
+export function BonusList({ items, max, onChange }: { items: { title: string; text: string; value: string }[]; max: number; onChange: (n: { title: string; text: string; value: string }[]) => void }) {
+  return (
+    <Rows items={items} max={max} blank={() => ({ title: "", text: "", value: "" })} addLabel="Add a bonus" onChange={onChange}
+      render={(x, set) => (
+        <>
+          <Input placeholder="Bonus" maxLength={120} value={x.title} onChange={(e) => set({ title: e.target.value })} />
+          <Textarea placeholder="What it is (optional)" maxLength={400} rows={2} value={x.text} onChange={(e) => set({ text: e.target.value })} />
+          <Input placeholder="Worth (optional, e.g. ₹1,999)" maxLength={20} value={x.value} onChange={(e) => set({ value: e.target.value })} />
+        </>
+      )}
+    />
+  );
+}
+
 export function TestimonialList({ items, max, onChange }: { items: { name: string; role: string; quote: string }[]; max: number; onChange: (n: { name: string; role: string; quote: string }[]) => void }) {
   return (
     <Rows items={items} max={max} blank={() => ({ name: "", role: "", quote: "" })} addLabel="Add a testimonial" onChange={onChange}

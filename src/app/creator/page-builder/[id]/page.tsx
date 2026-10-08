@@ -8,9 +8,10 @@ import toast from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { SearchSelect } from "@/components/ui/search-select";
 import { FunnelLanding, FunnelThanks } from "@/components/funnel/funnel-pages";
-import { FaqList, StringList, TestimonialList, TitledList } from "@/components/funnel/list-editors";
-import { LIMITS, THEMES, missingForPublish, type LandingContent, type ThanksContent, type ThemeId } from "@/lib/funnel";
+import { BonusList, FaqList, StringList, TestimonialList, TitledList } from "@/components/funnel/list-editors";
+import { LIMITS, THEMES, eventParts, missingForPublish, type LandingContent, type ThanksContent, type ThemeId } from "@/lib/funnel";
 import { cn } from "@/lib/utils";
 
 interface FunnelData {
@@ -19,16 +20,37 @@ interface FunnelData {
   slug: string;
   theme: ThemeId;
   serviceId: string;
+  workshopId: string;
   published: boolean;
   content: LandingContent;
   thanks: ThanksContent;
+}
+interface WorkshopOption {
+  id: string;
+  title: string;
+  description: string;
+  recurring: boolean;
+  serviceIds: string[];
+  event: { eventDate: string; timeZone: string; duration: string };
 }
 interface ServiceOption {
   id: string;
   title: string;
   price: number | string;
+  discounted_price?: number | string | null;
   service_type?: string;
   slug?: string;
+}
+
+const rupees = (n: number) => `₹${n.toLocaleString("en-IN")}`;
+
+/** The price a visitor will see: the discounted one when there is one, with the original struck through. */
+function previewPrice(s: ServiceOption): { now: string; was?: string } {
+  const full = Number(s.price) || 0;
+  const disc = s.discounted_price ? Number(s.discounted_price) : null;
+  const shown = disc ?? full;
+  if (s.service_type === "free" || shown === 0) return { now: "Free" };
+  return { now: rupees(shown), ...(disc !== null && full > shown ? { was: rupees(full) } : {}) };
 }
 
 type Stage = "landing" | "registration" | "thanks";
@@ -40,12 +62,14 @@ const STAGES: { id: Stage; label: string }[] = [
 
 /** One mini-problem at a time. `section` is the part of the page the preview scrolls to. */
 const STEPS = [
-  { id: "event", section: "event", title: "When is your webinar?", hint: "Visitors see this at the top of the page and in the sticky bar.", needs: (c: LandingContent) => !!c.eventDate },
-  { id: "headline", section: "event", title: "What is your headline?", hint: "One clear promise. Who it is for and what they will get.", needs: (c: LandingContent) => !!c.headline.trim() },
+  { id: "event", section: "event", title: "Which workshop is this page for?", hint: "The date, time and duration come from your workshop, so you only set them once.", needs: (f: FunnelData) => !!f.workshopId },
+  { id: "headline", section: "event", title: "What is your headline?", hint: "One clear promise. Who it is for and what they will get.", needs: (f: FunnelData) => !!f.content.headline.trim() },
+  { id: "badge", section: "event", title: "Call out who it is for", hint: "A small label above the headline, like “ATTENTION: Full-Stack Developers!”.", optional: true },
   { id: "subheadline", section: "event", title: "Add a subheadline", hint: "One or two sentences that back up the headline.", optional: true },
-  { id: "cta", section: "event", title: "What should the button say?", hint: "Short and active, like “Reserve my seat”.", optional: true },
-  { id: "topics", section: "topics", title: "What will you cover?", hint: "The main topics, in order. Up to 7.", needs: (c: LandingContent) => c.topics.some((t) => t.title.trim()) },
-  { id: "outcomes", section: "outcomes", title: "What will people walk away with?", hint: "Concrete results, one line each. Up to 6.", optional: true },
+  { id: "cta", section: "event", title: "What should the button say?", hint: "Short and active. You can also set the closing headline near the bottom of the page.", optional: true },
+  { id: "seats", section: "event", title: "Show how many seats are taken?", hint: "Optional. It appears in the top bar, like “234 seats claimed of 500”.", optional: true },
+  { id: "topics", section: "topics", title: "What will you cover?", hint: "The main topics, in order. Up to 7.", needs: (f: FunnelData) => f.content.topics.some((t) => t.title.trim()) },
+  { id: "outcomes", section: "outcomes", title: "What will people walk away with?", hint: "Concrete results in the order they happen. The last one is shown as the finish line. Up to 6.", optional: true },
   { id: "audience", section: "audience", title: "Who is this for?", hint: "Up to 4 kinds of people who will benefit most.", optional: true },
   { id: "host", section: "host", title: "Tell people about the host", hint: "Your name, a short bio and a photo build trust.", optional: true },
   { id: "testimonials", section: "testimonials", title: "Add testimonials", hint: "Skip this if you have none yet. Up to 6.", optional: true },
@@ -61,15 +85,21 @@ export default function FunnelBuilderPage({ params }: { params: Promise<{ id: st
   const [stage, setStage] = useState<Stage>("landing");
   const [step, setStep] = useState(0);
   const [services, setServices] = useState<ServiceOption[]>([]);
+  const [workshops, setWorkshops] = useState<WorkshopOption[]>([]);
   const [saveState, setSaveState] = useState<"saved" | "saving" | "error">("saved");
   const [busy, setBusy] = useState(false);
   const loaded = useRef(false);
   const dirty = useRef(false);
   const previewRef = useRef<HTMLDivElement>(null);
 
+  const loadWorkshops = useCallback(async () => {
+    const res = await fetch("/api/funnels/options");
+    if (res.ok) setWorkshops(await res.json());
+  }, []);
+
   const loadServices = useCallback(async () => {
     const res = await fetch("/api/services");
-    if (res.ok) setServices(await res.json());
+    if (res.ok) setServices((await res.json()).map((s: ServiceOption) => ({ ...s, id: String(s.id) })));
   }, []);
 
   useEffect(() => {
@@ -79,7 +109,9 @@ export default function FunnelBuilderPage({ params }: { params: Promise<{ id: st
       setFunnel(await res.json());
       loaded.current = true;
       const list = await fetch("/api/services");
-      if (list.ok) setServices(await list.json());
+      if (list.ok) setServices((await list.json()).map((s: ServiceOption) => ({ ...s, id: String(s.id) })));
+      const opts = await fetch("/api/funnels/options");
+      if (opts.ok) setWorkshops(await opts.json());
     })();
   }, [id, router]);
 
@@ -89,7 +121,7 @@ export default function FunnelBuilderPage({ params }: { params: Promise<{ id: st
       const res = await fetch(`/api/funnels/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: f.title, theme: f.theme, content: f.content, thanks: f.thanks, serviceId: f.serviceId }),
+        body: JSON.stringify({ title: f.title, theme: f.theme, content: f.content, thanks: f.thanks, serviceId: f.serviceId, workshopId: f.workshopId }),
       });
       dirty.current = false;
       setSaveState(res.ok ? "saved" : "error");
@@ -122,12 +154,15 @@ export default function FunnelBuilderPage({ params }: { params: Promise<{ id: st
     if (box && el) box.scrollTo({ top: Math.max(0, el.offsetTop - 70), behavior: "smooth" });
   }, [section, step, funnel?.content.topics.length, funnel?.content.faqs.length]);
 
+  const workshop = useMemo(() => workshops.find((w) => w.id === funnel?.workshopId), [workshops, funnel?.workshopId]);
   const service = useMemo(() => services.find((s) => s.id === funnel?.serviceId), [services, funnel?.serviceId]);
   if (!funnel) return <div className="py-20 text-center text-gray-400">Loading...</div>;
 
-  const registerHref = service?.slug ? `/s/${service.slug}` : "#";
-  const priceLabel = service ? (service.service_type === "free" || !Number(service.price) ? "Free" : `₹${Number(service.price).toLocaleString("en-IN")}`) : "";
-  const canNext = !("needs" in current) || current.needs(funnel.content);
+  const registerHref = service?.slug ? `/checkout/${service.slug}` : "#";
+  const price = service ? previewPrice(service) : undefined;
+  const linkedServices = services.filter((s) => workshop?.serviceIds.includes(s.id));
+  const priceTag = (s: ServiceOption) => (s.service_type === "free" || !Number(s.price) ? "Free" : rupees(Number(s.price)));
+  const canNext = !("needs" in current) || current.needs(funnel);
 
   async function go(to: Stage) {
     if (dirty.current && funnel) await save(funnel);
@@ -157,9 +192,11 @@ export default function FunnelBuilderPage({ params }: { params: Promise<{ id: st
     toast.success(live ? "Your webinar page is live" : "Page unpublished");
   }
 
-  const missing = missingForPublish(funnel.content, funnel.serviceId);
+  const missing = missingForPublish(funnel.content, funnel.serviceId, funnel.workshopId);
   const publicUrl = typeof window !== "undefined" ? `${window.location.origin}/w/${funnel.slug}` : `/w/${funnel.slug}`;
   const host = { brand: "Your brand" };
+  // The preview shows the workshop's real date, time and duration.
+  const previewContent = { ...funnel.content, ...(workshop?.event ?? { eventDate: "" }) };
 
   const form = (
     <div className="space-y-5">
@@ -173,22 +210,75 @@ export default function FunnelBuilderPage({ params }: { params: Promise<{ id: st
 
           {current.id === "event" && (
             <div className="space-y-3">
-              <Input label="Date and time" type="datetime-local" value={funnel.content.eventDate} onChange={(e) => setC({ eventDate: e.target.value })} />
-              <div className="grid grid-cols-2 gap-3">
-                <Input label="How long" maxLength={40} value={funnel.content.duration} onChange={(e) => setC({ duration: e.target.value })} />
-                <Input label="Language" maxLength={40} value={funnel.content.language} onChange={(e) => setC({ language: e.target.value })} />
+              {workshops.length === 0 ? (
+                <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">You have no workshops yet. Create one, then come back and refresh.</p>
+              ) : (
+                <SearchSelect
+                  label="Workshop"
+                  placeholder="Select a workshop"
+                  searchPlaceholder="Search workshop by name"
+                  value={funnel.workshopId}
+                  options={workshops.map((w) => ({ value: w.id, label: w.title }))}
+                  onChange={(id) => {
+                    const w = workshops.find((x) => x.id === id);
+                    edit((f) => ({
+                      ...f,
+                      workshopId: id,
+                      // The page is named after the workshop, and registers people through its linked service.
+                      title: w?.title || f.title,
+                      serviceId: w ? (w.serviceIds.includes(f.serviceId) ? f.serviceId : w.serviceIds.find((sid) => services.some((x) => x.id === sid)) ?? "") : "",
+                      content: { ...f.content, headline: f.content.headline || w?.title || "" },
+                    }));
+                  }}
+                />
+              )}
+              {workshop && (
+                <p className="rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-600">
+                  {(() => {
+                    const when = eventParts(workshop.event.eventDate);
+                    return when
+                      ? `Next session: ${when.date}, ${when.time} ${workshop.event.timeZone} · ${workshop.event.duration}${workshop.recurring ? " · repeats weekly" : ""}`
+                      : "This workshop has no upcoming session.";
+                  })()}
+                </p>
+              )}
+              <div className="flex gap-2">
+                <a href="/creator/workshops" target="_blank" rel="noreferrer"><Button variant="outline" size="sm"><ExternalLink className="h-4 w-4" /> Create a new workshop</Button></a>
+                <Button variant="ghost" size="sm" onClick={loadWorkshops}><RefreshCw className="h-4 w-4" /> Refresh</Button>
               </div>
+              <Input label="Language" maxLength={40} value={funnel.content.language} onChange={(e) => setC({ language: e.target.value })} />
             </div>
           )}
-          {current.id === "headline" && <Textarea rows={3} maxLength={LIMITS.headline} placeholder="e.g. AI Engineer Roadmap Masterclass" value={funnel.content.headline} onChange={(e) => setC({ headline: e.target.value })} />}
+          {current.id === "headline" && (
+            <div className="space-y-3">
+              <Textarea rows={3} maxLength={LIMITS.headline} placeholder="e.g. Master the 7-Pillar AI Roadmap and land an AI job in 60 days" value={funnel.content.headline} onChange={(e) => setC({ headline: e.target.value })} />
+              <Input label="Words to highlight (optional)" maxLength={LIMITS.headline} placeholder="Copy part of your headline, e.g. 7-Pillar AI Roadmap" value={funnel.content.highlight} onChange={(e) => setC({ highlight: e.target.value })} />
+              {funnel.content.highlight.trim() && !funnel.content.headline.includes(funnel.content.highlight.trim()) && <p className="text-xs text-amber-700">These words are not in your headline, so nothing is highlighted.</p>}
+            </div>
+          )}
+          {current.id === "badge" && <Input maxLength={80} placeholder="ATTENTION: Full-Stack Developers!" value={funnel.content.badge} onChange={(e) => setC({ badge: e.target.value })} />}
           {current.id === "subheadline" && <Textarea rows={3} maxLength={LIMITS.sub} value={funnel.content.subheadline} onChange={(e) => setC({ subheadline: e.target.value })} />}
-          {current.id === "cta" && <Input maxLength={40} value={funnel.content.ctaText} onChange={(e) => setC({ ctaText: e.target.value })} />}
+          {current.id === "cta" && (
+            <div className="space-y-3">
+              <Input label="Button text" maxLength={50} value={funnel.content.ctaText} onChange={(e) => setC({ ctaText: e.target.value })} />
+              <Input label="Closing headline (bottom of the page)" maxLength={LIMITS.headline} placeholder="e.g. Your AI Engineering Career Starts Here" value={funnel.content.closingHeadline} onChange={(e) => setC({ closingHeadline: e.target.value })} />
+            </div>
+          )}
+          {current.id === "seats" && (
+            <div className="grid grid-cols-2 gap-3">
+              <Input label="Seats taken" inputMode="numeric" maxLength={6} value={funnel.content.seatsClaimed} onChange={(e) => setC({ seatsClaimed: e.target.value.replace(/\D/g, "") })} />
+              <Input label="Total seats" inputMode="numeric" maxLength={6} value={funnel.content.seatsTotal} onChange={(e) => setC({ seatsTotal: e.target.value.replace(/\D/g, "") })} />
+            </div>
+          )}
           {current.id === "topics" && <TitledList items={funnel.content.topics} max={LIMITS.topics} onChange={(topics) => setC({ topics })} addLabel="Add a topic" titleLabel="Topic" textLabel="One line about it (optional)" />}
-          {current.id === "outcomes" && <StringList items={funnel.content.outcomes} max={LIMITS.outcomes} onChange={(outcomes) => setC({ outcomes })} addLabel="Add a result" placeholder="e.g. A 90-day action plan" />}
+          {current.id === "outcomes" && <TitledList items={funnel.content.outcomes} max={LIMITS.outcomes} onChange={(outcomes) => setC({ outcomes })} addLabel="Add a result" titleLabel="Result (e.g. A 90-day plan)" textLabel="One line about it (optional)" />}
           {current.id === "audience" && <TitledList items={funnel.content.audience} max={LIMITS.audience} onChange={(audience) => setC({ audience })} addLabel="Add a group" titleLabel="Who (e.g. Backend engineers)" textLabel="Why it helps them (optional)" />}
           {current.id === "host" && (
             <div className="space-y-3">
-              <Input label="Name" maxLength={80} value={funnel.content.hostName} onChange={(e) => setC({ hostName: e.target.value })} />
+              <div className="grid grid-cols-2 gap-3">
+                <Input label="Name" maxLength={80} value={funnel.content.hostName} onChange={(e) => setC({ hostName: e.target.value })} />
+                <Input label="Title" maxLength={80} placeholder="Founder, Acme" value={funnel.content.hostTitle} onChange={(e) => setC({ hostTitle: e.target.value })} />
+              </div>
               <Textarea label="Short bio" rows={4} maxLength={LIMITS.bio} value={funnel.content.hostBio} onChange={(e) => setC({ hostBio: e.target.value })} />
               <div className="flex items-center gap-3">
                 {funnel.content.hostPhoto && <img src={funnel.content.hostPhoto} alt="" className="h-14 w-14 rounded-full object-cover" />}
@@ -201,7 +291,7 @@ export default function FunnelBuilderPage({ params }: { params: Promise<{ id: st
             </div>
           )}
           {current.id === "testimonials" && <TestimonialList items={funnel.content.testimonials} max={LIMITS.testimonials} onChange={(testimonials) => setC({ testimonials })} />}
-          {current.id === "bonuses" && <TitledList items={funnel.content.bonuses} max={LIMITS.bonuses} onChange={(bonuses) => setC({ bonuses })} addLabel="Add a bonus" titleLabel="Bonus" textLabel="What it is (optional)" />}
+          {current.id === "bonuses" && <BonusList items={funnel.content.bonuses} max={LIMITS.bonuses} onChange={(bonuses) => setC({ bonuses })} />}
           {current.id === "faqs" && <FaqList items={funnel.content.faqs} max={LIMITS.faqs} onChange={(faqs) => setC({ faqs })} />}
           {current.id === "theme" && (
             <div className="grid grid-cols-3 gap-3">
@@ -234,26 +324,35 @@ export default function FunnelBuilderPage({ params }: { params: Promise<{ id: st
       {stage === "registration" && (
         <>
           <div>
-            <h2 className="text-xl font-bold text-gray-900">Choose the service people register for</h2>
-            <p className="mt-1 text-sm text-gray-500">The button on your landing page takes people to this service&apos;s page, where they pay or sign up.</p>
+            <h2 className="text-xl font-bold text-gray-900">Registration page</h2>
+            <p className="mt-1 text-sm text-gray-500">The button on your landing page takes people straight to checkout for the service linked to your workshop.</p>
           </div>
-          {services.length === 0 ? (
-            <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">You have no services yet. Create one, then come back and refresh.</p>
-          ) : (
-            <div className="space-y-2">
-              {services.map((s) => (
-                <button key={s.id} type="button" onClick={() => edit((f) => ({ ...f, serviceId: s.id }))}
-                  className={cn("flex w-full items-center justify-between rounded-xl border-2 p-3 text-left", funnel.serviceId === s.id ? "border-indigo-600 bg-indigo-50" : "border-gray-200 hover:border-gray-300")}>
-                  <span className="font-medium text-gray-900">{s.title}</span>
-                  <span className="text-sm text-gray-500">{s.service_type === "free" || !Number(s.price) ? "Free" : `₹${Number(s.price).toLocaleString("en-IN")}`}</span>
-                </button>
-              ))}
+          {linkedServices.length > 1 && (
+            <SearchSelect
+              label="Which service should this page sell?"
+              placeholder="Select a service"
+              searchPlaceholder="Search service by name"
+              value={funnel.serviceId}
+              options={linkedServices.map((x) => ({ value: x.id, label: x.title, hint: priceTag(x) }))}
+              onChange={(id) => edit((f) => ({ ...f, serviceId: id }))}
+            />
+          )}
+          {linkedServices.length <= 1 && service && (
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4">
+              <div className="min-w-0">
+                <p className="truncate font-semibold text-gray-900">{service.title}</p>
+                <p className="text-xs text-gray-500">Linked to your workshop</p>
+              </div>
+              <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">{priceTag(service)}</span>
             </div>
           )}
-          <div className="flex gap-2">
-            <a href="/creator/services/new" target="_blank" rel="noreferrer"><Button variant="outline" size="sm"><ExternalLink className="h-4 w-4" /> Create a new service</Button></a>
-            <Button variant="ghost" size="sm" onClick={loadServices}><RefreshCw className="h-4 w-4" /> Refresh</Button>
-          </div>
+          {!service && (
+            <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
+              Your workshop has no service linked yet. Link one in the workshop, then come back and refresh.{" "}
+              <a href="/creator/workshops" target="_blank" rel="noreferrer" className="font-medium underline">Open workshops</a>
+            </p>
+          )}
+          <Button variant="ghost" size="sm" onClick={() => { loadServices(); loadWorkshops(); }}><RefreshCw className="h-4 w-4" /> Refresh</Button>
           <div className="flex items-center justify-between pt-2">
             <Button variant="ghost" onClick={() => go("landing")}><ArrowLeft className="h-4 w-4" /> Back</Button>
             <Button disabled={!funnel.serviceId} onClick={() => go("thanks")}>Next: thank-you page <ArrowRight className="h-4 w-4" /></Button>
@@ -267,8 +366,9 @@ export default function FunnelBuilderPage({ params }: { params: Promise<{ id: st
             <h2 className="text-xl font-bold text-gray-900">Your thank-you page</h2>
             <p className="mt-1 text-sm text-gray-500">People see this right after they register. It uses the same look as your landing page.</p>
           </div>
-          <Input label="Headline" maxLength={LIMITS.headline} value={funnel.thanks.headline} onChange={(e) => setT({ headline: e.target.value })} />
-          <Textarea label="Message" rows={3} maxLength={LIMITS.text} value={funnel.thanks.message} onChange={(e) => setT({ message: e.target.value })} />
+          <Input label="Big headline" maxLength={LIMITS.headline} value={funnel.thanks.headline} onChange={(e) => setT({ headline: e.target.value })} />
+          <Input label="Message" maxLength={LIMITS.text} value={funnel.thanks.message} onChange={(e) => setT({ message: e.target.value })} />
+          <Textarea label="Note (optional)" rows={2} maxLength={LIMITS.text} placeholder="e.g. Join our private community to get the link of the workshop" value={funnel.thanks.note} onChange={(e) => setT({ note: e.target.value })} />
           <div>
             <p className="mb-1 text-sm font-medium text-gray-700">What happens next (optional)</p>
             <StringList items={funnel.thanks.steps} max={5} onChange={(steps) => setT({ steps })} addLabel="Add a line" placeholder="e.g. Check your email" />
@@ -310,13 +410,7 @@ export default function FunnelBuilderPage({ params }: { params: Promise<{ id: st
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 bg-white px-4 py-3">
         <div className="flex items-center gap-3">
           <Link href="/creator/page-builder/webinar" className="text-gray-400 hover:text-gray-700"><ArrowLeft className="h-5 w-5" /></Link>
-          <input
-            aria-label="Page name"
-            className="rounded px-1 text-base font-semibold text-gray-900 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-            value={funnel.title}
-            maxLength={100}
-            onChange={(e) => edit((f) => ({ ...f, title: e.target.value }))}
-          />
+          <span className="max-w-[16rem] truncate text-base font-semibold text-gray-900">{workshop?.title || "New webinar page"}</span>
           <span className="text-xs text-gray-400">{saveState === "saving" ? "Saving..." : saveState === "error" ? "Not saved" : "Saved"}</span>
         </div>
         <ol className="flex items-center gap-1 text-sm">
@@ -346,7 +440,7 @@ export default function FunnelBuilderPage({ params }: { params: Promise<{ id: st
             {stage === "thanks" ? (
               <FunnelThanks content={funnel.thanks} theme={funnel.theme} host={host} />
             ) : (
-              <FunnelLanding content={funnel.content} theme={funnel.theme} host={host} registerHref={registerHref} priceLabel={priceLabel} />
+              <FunnelLanding content={previewContent} theme={funnel.theme} host={host} registerHref={registerHref} price={price} />
             )}
           </div>
         </div>

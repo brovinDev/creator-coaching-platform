@@ -3,6 +3,7 @@ import { auth, getNocodeToken } from "@/lib/auth";
 import { nocodeDb } from "@/lib/nocode/db";
 import { cleanContent, cleanThanks, isTheme, missingForPublish } from "@/lib/funnel";
 import { toFunnel } from "@/lib/funnel-store";
+import { slugify } from "@/lib/utils";
 
 async function owned(id: string) {
   const session = await auth();
@@ -44,10 +45,29 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     patch.service_id = serviceId || null;
   }
 
+  let workshopId = current.workshopId;
+  if (body.workshopId !== undefined) {
+    workshopId = String(body.workshopId || "");
+    if (workshopId) {
+      const workshop = await nocodeDb.workshops.findUnique({ id: workshopId }, o.token).catch(() => null);
+      if (!workshop || String(workshop.creator_id) !== o.userId) return NextResponse.json({ error: "Workshop not found" }, { status: 404 });
+      // A page that is not live yet is named after its workshop. A live page keeps its address.
+      if (workshopId !== current.workshopId && !current.published) {
+        const name = String(workshop.title || "").slice(0, 100);
+        patch.title = name;
+        let slug = slugify(name) || "webinar";
+        const clash = await nocodeDb.funnels.findUnique({ slug }, o.token);
+        if (clash && String(clash.id) !== id) slug = `${slug}-${Date.now().toString(36)}`;
+        patch.slug = slug;
+      }
+    }
+    patch.workshop_id = workshopId || null;
+  }
+
   if (body.published !== undefined) {
     const wantLive = body.published === true;
     if (wantLive) {
-      const missing = missingForPublish(content, serviceId);
+      const missing = missingForPublish(content, serviceId, workshopId);
       if (missing.length) return NextResponse.json({ error: `Before publishing, add ${missing.join(", ")}.` }, { status: 400 });
     }
     patch.published = wantLive;

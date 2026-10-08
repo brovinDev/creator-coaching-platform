@@ -2,6 +2,7 @@ import { nocodeDb } from "@/lib/nocode/db";
 import { getBranding } from "@/lib/branding";
 import { formatPrice } from "@/lib/utils";
 import { funnelBySlug, type Funnel } from "@/lib/funnel-store";
+import { eventOfWorkshop } from "@/lib/funnel-event";
 
 const SYSTEM_TOKEN = process.env.NOCODE_SYSTEM_TOKEN || "";
 
@@ -10,7 +11,7 @@ export interface PublicFunnel {
   brand: string;
   logo: string;
   registerHref: string;
-  priceLabel: string;
+  price: { now: string; was?: string };
 }
 
 /** A funnel visitors may see: published, with its registration service still existing. */
@@ -20,6 +21,12 @@ export async function loadPublicFunnel(slug: string): Promise<PublicFunnel | nul
 
   const service = await nocodeDb.services.findUnique({ id: funnel.serviceId }, SYSTEM_TOKEN).catch(() => null);
   if (!service) return null;
+
+  // The date, time and duration always come from the workshop, so editing the workshop updates the page.
+  const workshop = funnel.workshopId
+    ? await nocodeDb.workshops.findUnique({ id: funnel.workshopId }, SYSTEM_TOKEN).catch(() => null)
+    : null;
+  if (workshop) funnel.content = { ...funnel.content, ...eventOfWorkshop(workshop) };
 
   const creatorId = String(service.creator_id);
   const [branding, profile] = await Promise.all([
@@ -32,12 +39,13 @@ export async function loadPublicFunnel(slug: string): Promise<PublicFunnel | nul
   const discounted = service.discounted_price ? Number(service.discounted_price) : null;
   const shown = discounted ?? price;
   const free = service.service_type === "free" || shown === 0;
+  const was = !free && discounted !== null && price > shown ? formatPrice(price) : undefined;
 
   return {
     funnel,
     brand: branding.brandName || name || "Creator",
     logo: branding.logoUrl,
-    registerHref: `/s/${String(service.slug || service.id)}`,
-    priceLabel: free ? "Free" : formatPrice(shown),
+    registerHref: `/checkout/${String(service.slug || service.id)}`,
+    price: { now: free ? "Free" : formatPrice(shown), ...(was ? { was } : {}) },
   };
 }

@@ -2,15 +2,24 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth, getNocodeToken } from "@/lib/auth";
 import { nocodeDb } from "@/lib/nocode/db";
 import { slugify } from "@/lib/utils";
-import { cleanContent, defaultThanks, emptyContent } from "@/lib/funnel";
+import { DEFAULT_THEME, cleanContent, defaultThanks, emptyContent } from "@/lib/funnel";
 import { toFunnel } from "@/lib/funnel-store";
 
 export async function GET() {
   const session = await auth();
   if (!session?.user || session.user.role !== "CREATOR") return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const rows = await nocodeDb.funnels.findMany({ where: { creator_id: session.user.id } }, await getNocodeToken());
-  return NextResponse.json(rows.map(toFunnel).map(({ id, kind, title, slug, published }) => ({ id, kind, title, slug, published })));
+  const token = await getNocodeToken();
+  const [rows, services] = await Promise.all([
+    nocodeDb.funnels.findMany({ where: { creator_id: session.user.id } }, token),
+    nocodeDb.services.findMany({ where: { creator_id: session.user.id } }, token),
+  ]);
+  const titles = new Map(services.map((x) => [String(x.id), String(x.title || "")]));
+  return NextResponse.json(
+    rows.map(toFunnel).map(({ id, kind, title, slug, published, serviceId }) => ({
+      id, kind, title, slug, published, serviceId, serviceTitle: titles.get(serviceId) || "",
+    }))
+  );
 }
 
 export async function POST(req: NextRequest) {
@@ -32,7 +41,7 @@ export async function POST(req: NextRequest) {
       kind: "webinar",
       title,
       slug,
-      theme: "light",
+      theme: DEFAULT_THEME,
       content: JSON.stringify(cleanContent(emptyContent())),
       thanks: JSON.stringify(defaultThanks()),
       published: false,
