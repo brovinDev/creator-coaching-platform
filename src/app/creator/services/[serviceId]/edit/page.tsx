@@ -527,13 +527,6 @@ export default function EditServicePage() {
           {/* ========== SERVICE DETAILS TAB ========== */}
           {activeTab === "details" && (
             <div className="space-y-6">
-              <div className="flex items-center gap-3">
-                <Toggle value={published} onChange={setPublished} />
-                <span className="text-sm font-medium text-gray-700">
-                  {published ? "Published (visible to learners)" : "Draft (not visible)"}
-                </span>
-              </div>
-
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="block text-sm font-medium text-gray-700">Service title</label>

@@ -545,6 +545,11 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
                   <div className="flex items-start justify-between gap-4">
                     <span className="text-sm text-gray-900">{service.title}</span>
                     <span className="text-sm font-medium text-gray-900 shrink-0">
+                      {service.discountedPrice !== null && (
+                        <span className="text-xs text-gray-400 line-through mr-2">
+                          {formatPrice(service.price)}
+                        </span>
+                      )}
                       {isFree && !appliedCoupon ? "Free" : formatPrice(basePrice)}
                     </span>
                   </div>

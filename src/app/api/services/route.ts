@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
       payment_success_message: body.payment_success_message || "",
       payment_config: body.payment_config || null,
       success_config: body.success_config || null,
-      published: false,
+      published: true,
     },
     token
   );
