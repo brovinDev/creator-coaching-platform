@@ -30,12 +30,18 @@ export async function GET(
   const branding = await getBranding(String(service.creator_id));
   const logoUrl = branding.logoUrl || creatorProfile?.avatar || null;
 
+  // A webinar funnel built on this service owns the thank-you page after registration.
+  const funnels = await nocodeDb.funnels.findMany({ where: { service_id: String(service.id) } }, SYSTEM_TOKEN).catch(() => []);
+  const funnel = funnels.find((f) => f.published === true || f.published === "true");
+
   return NextResponse.json({
+    funnel_slug: funnel ? String(funnel.slug) : null,
     id: service.id,
     title: service.title,
     description: service.description,
     cover_image: service.cover_image,
     service_type: service.service_type,
+    billing_interval: service.billing_interval ?? null,
     price: service.price,
     discounted_price: service.discounted_price,
     currency: service.currency,

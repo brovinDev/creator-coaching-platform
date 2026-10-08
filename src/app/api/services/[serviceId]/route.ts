@@ -51,7 +51,7 @@ export async function PUT(
 
   const body = await req.json();
   const allowedFields = [
-    "title", "description", "cover_image", "service_type", "status",
+    "title", "description", "cover_image", "service_type", "billing_interval", "status",
     "currency", "price", "discounted_price", "start_date", "enable_gst",
     "payment_success_message", "published", "course_id",
     "payment_config", "success_config",

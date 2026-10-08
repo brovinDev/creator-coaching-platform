@@ -13,6 +13,8 @@ import {
   Plus, X, ChevronDown, ChevronUp, Copy,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import { BillingIntervalField } from "@/components/creator/billing-interval-field";
+import { isBillingInterval, type BillingInterval } from "@/lib/billing-intervals";
 
 // Beefree touches window on load, so it must never render on the server.
 
@@ -70,6 +72,7 @@ export default function EditServicePage() {
   const [description, setDescription] = useState("");
   const [coverImage, setCoverImage] = useState("");
   const [serviceType, setServiceType] = useState<ServiceType>("one-time");
+  const [billingInterval, setBillingInterval] = useState<BillingInterval>("monthly");
   const [enableGst, setEnableGst] = useState(false);
   const [price, setPrice] = useState("");
   const [hasDiscount, setHasDiscount] = useState(false);
@@ -112,6 +115,7 @@ export default function EditServicePage() {
         setDescription(data.description || "");
         setCoverImage(data.cover_image || "");
         setServiceType(data.service_type || "one-time");
+        if (isBillingInterval(data.billing_interval)) setBillingInterval(data.billing_interval);
         setEnableGst(!!data.enable_gst);
         setPrice(data.price ? String(data.price) : "");
         setHasDiscount(!!data.discounted_price);
@@ -196,6 +200,7 @@ export default function EditServicePage() {
           description,
           cover_image: coverImage || null,
           service_type: serviceType,
+          billing_interval: serviceType === "subscription" ? billingInterval : null,
           enable_gst: enableGst,
           price: serviceType === "free" ? 0 : Number(price),
           discounted_price: hasDiscount ? Number(discountedPrice) : null,
@@ -583,6 +588,8 @@ export default function EditServicePage() {
                   ))}
                 </div>
               </div>
+
+              {serviceType === "subscription" && <BillingIntervalField value={billingInterval} onChange={setBillingInterval} />}
 
               <div className="flex items-center gap-3">
                 <Toggle value={enableGst} onChange={setEnableGst} />

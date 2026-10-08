@@ -300,6 +300,73 @@ export async function getPaymentByOrderId(orderId: string): Promise<RecordedPaym
   }
 }
 
+export interface ProviderPayment {
+  id: string;
+  /** In the smallest currency unit (paise). */
+  amount: number;
+  currency: string;
+  /** "succeeded" once Razorpay has captured it. */
+  status: string;
+  /** For a payment id: the order it was paid against. */
+  orderId?: string;
+}
+
+/**
+ * Asks Razorpay (through the backend, with the keys connected there) about a payment or order by id.
+ * Unlike getPaymentByOrderId this does not wait for the webhook. Null when it cannot be found.
+ */
+export async function getRazorpayPayment(id: string, token: string): Promise<ProviderPayment | null> {
+  try {
+    const res = await request<{ payment?: ProviderPayment }>(`/api/payments/${encodeURIComponent(id)}`, { token });
+    return res.payment ?? null;
+  } catch (error) {
+    if (error instanceof NocodeApiError && error.status === 404) return null;
+    throw error;
+  }
+}
+
+// ------------------------------------------------------------------
+// Recurring payments (Razorpay Subscriptions, through the backend)
+// ------------------------------------------------------------------
+
+export interface ProviderSubscription {
+  id: string;
+  /** created, authenticated, active, pending, halted, cancelled, completed, expired or paused. */
+  status: string;
+  paidCount: number;
+  /** Unix seconds: the end of the period already paid for. */
+  currentEnd: number | null;
+  payments: { paymentId: string; amountPaise: number; paidAt: number | null }[];
+}
+
+/** One Razorpay plan: a price at a billing interval. Returns its id. */
+export async function createRazorpayPlan(
+  data: { name: string; amountPaise: number; interval: string; notes?: Record<string, string> },
+  token: string
+) {
+  const res = await request<{ planId: string }>("/api/open-slate/plans", { method: "POST", body: data, token });
+  return res.planId;
+}
+
+export async function createRazorpaySubscription(
+  data: { planId: string; totalCount: number; notes?: Record<string, string> },
+  token: string
+) {
+  return request<{ subscriptionId: string; keyId: string }>("/api/open-slate/subscriptions", { method: "POST", body: data, token });
+}
+
+export async function getRazorpaySubscription(id: string, token: string) {
+  return request<ProviderSubscription>(`/api/open-slate/subscriptions/${encodeURIComponent(id)}`, { token });
+}
+
+export async function cancelRazorpaySubscription(id: string, token: string) {
+  return request<{ status: string }>(`/api/open-slate/subscriptions/${encodeURIComponent(id)}/cancel`, {
+    method: "POST",
+    body: { atCycleEnd: true },
+    token,
+  });
+}
+
 // ------------------------------------------------------------------
 // Helpers
 // ------------------------------------------------------------------

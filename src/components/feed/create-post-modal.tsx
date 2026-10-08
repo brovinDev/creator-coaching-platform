@@ -142,7 +142,7 @@ export function CreatePostModal({
     if (!open || services.length > 0) return;
     fetch("/api/services")
       .then((r) => (r.ok ? r.json() : []))
-      .then((list: ServiceOption[]) => setServices(Array.isArray(list) ? list : []))
+      .then((list: ServiceOption[]) => setServices(Array.isArray(list) ? list.map((s) => ({ ...s, id: String(s.id) })) : []))
       .catch(() => {});
   }, [open, services.length]);
 

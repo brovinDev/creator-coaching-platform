@@ -13,6 +13,7 @@ import { formatPrice } from "@/lib/utils";
 import { buttonStyle } from "@/lib/branding-colors";
 import { ThemeScope } from "@/components/theme-scope";
 import toast from "react-hot-toast";
+import { intervalSuffix } from "@/lib/billing-intervals";
 
 const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME || "Open Slate";
 
@@ -38,6 +39,8 @@ interface ServiceData {
   discountedPrice: number | null;
   enableGst: boolean;
   serviceType: string;
+  /** monthly, quarterly, half-yearly or yearly, for a subscription. */
+  billingInterval: string;
   slug: string;
   creator: { name: string; logo: string | null };
   branding?: { themeColor: string; termsUrl: string; privacyUrl: string };
@@ -111,7 +114,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
         coverImage: s.cover_image || null,
         price: Number(s.price) || 0,
         discountedPrice: s.discounted_price ? Number(s.discounted_price) : null,
-        enableGst: !!s.enable_gst, serviceType: s.service_type || "one-time",
+        enableGst: !!s.enable_gst, serviceType: s.service_type || "one-time", billingInterval: s.billing_interval || "",
         slug: s.slug || "",
         creator: s.creator || { name: "Creator", logo: null },
         branding: s.branding,
@@ -128,7 +131,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
         title: c.title || "", description: c.description || "",
         coverImage: c.thumbnail || null,
         price: Number(c.price) || 0, discountedPrice: null,
-        enableGst: false, serviceType: "one-time", slug: c.slug || "",
+        enableGst: false, serviceType: "one-time", billingInterval: "", slug: c.slug || "",
         creator: c.creator || { name: "Creator", logo: null },
         customFields: [],
       });
@@ -148,6 +151,8 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
   const gstAmount = service?.enableGst ? Math.round(priceAfterCoupon * 0.18) : 0;
   const totalAmount = priceAfterCoupon + gstAmount;
   const isFree = service?.serviceType === "free" || totalAmount === 0;
+  const isSubscription = service?.serviceType === "subscription" && !isFree;
+  const every = intervalSuffix(service?.billingInterval);
 
   async function handleSendOtp(e?: React.FormEvent) {
     if (e) e.preventDefault();
@@ -277,6 +282,35 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
         setSubmitting(false);
         return;
       }
+      if (isSubscription) {
+        const subRes = await fetch("/api/checkout/create-subscription", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ serviceId: service.id }),
+        });
+        const subData = await subRes.json();
+        if (!subRes.ok) { toast.error(subData.error || "Could not start the subscription"); setSubmitting(false); return; }
+
+        const subOptions = {
+          key: subData.key, subscription_id: subData.subscriptionId,
+          name: APP_NAME, description: `${service.title} ${every}`,
+          prefill: { name: form.name, email: form.email },
+          handler: async (response: { razorpay_payment_id: string; razorpay_subscription_id: string }) => {
+            const verifyRes = await fetch("/api/checkout/verify-subscription", {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ subscriptionId: response.razorpay_subscription_id || subData.subscriptionId }),
+            });
+            if (verifyRes.ok) {
+              const vd = await verifyRes.json();
+              const p = new URLSearchParams({ txn: vd.transactionId || response.razorpay_payment_id, amount: String(vd.amount || ""), service: vd.serviceName || "", method: "Razorpay", sid: service.id });
+              router.push(`/payment-success?${p.toString()}`);
+            } else router.push("/payment-failed");
+          },
+          modal: { ondismiss: () => setSubmitting(false) },
+          theme: { color: "#4F46E5" },
+        };
+        new window.Razorpay(subOptions).open();
+        return;
+      }
       const orderRes = await fetch("/api/checkout/create-order", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...purchaseTarget(service), couponId: appliedCoupon?.couponId, customFields: customFieldValues }),
@@ -340,6 +374,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
                 </p>
                 <p className="text-2xl font-bold text-gray-900 mt-3">
                   {isFree ? "Free" : formatPrice(basePrice)}
+                  {isSubscription && every && <span className="text-base font-medium text-gray-500 ml-1">{every}</span>}
                   {service.discountedPrice !== null && (
                     <span className="text-base text-gray-400 line-through ml-2">
                       {formatPrice(service.price)}
@@ -511,7 +546,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
                         <X className="h-4 w-4" />
                       </button>
                     </div>
-                  ) : !showCoupon ? (
+                  ) : isSubscription ? null : !showCoupon ? (
                     <button
                       onClick={() => setShowCoupon(true)}
                       className="w-full flex items-center justify-between px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-600 hover:border-gray-300 transition-colors cursor-pointer"
@@ -567,8 +602,10 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
                     <span className="text-sm font-semibold text-gray-900">Amount to be paid :</span>
                     <span className="text-base font-bold text-gray-900">
                       {isFree ? "Free" : formatPrice(totalAmount)}
+                      {isSubscription && every && <span className="font-medium text-gray-500"> {every}</span>}
                     </span>
                   </div>
+                  {isSubscription && <p className="text-xs text-gray-500">Renews automatically {every.replace("/ ", "every ")} until you cancel. You can cancel any time.</p>}
                 </div>
 
                 {/* Pay button */}
@@ -578,7 +615,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
                   className="w-full mt-5 py-3.5 bg-gray-400 hover:bg-gray-500 disabled:bg-gray-300 text-white rounded-lg text-sm font-semibold transition-colors cursor-pointer disabled:cursor-not-allowed"
                   style={authStep === "done" ? buttonStyle(service.branding?.themeColor) : {}}
                 >
-                  {submitting ? "Processing..." : isFree ? "Register" : `Proceed to pay ${formatPrice(totalAmount)}`}
+                  {submitting ? "Processing..." : isFree ? "Register" : isSubscription ? `Subscribe for ${formatPrice(totalAmount)} ${every}` : `Proceed to pay ${formatPrice(totalAmount)}`}
                 </button>
 
                 {(service.branding?.termsUrl || service.branding?.privacyUrl) && (

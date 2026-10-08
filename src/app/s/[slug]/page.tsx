@@ -1,6 +1,7 @@
 import { nocodeDb } from "@/lib/nocode/db";
 import { notFound } from "next/navigation";
 import { formatPrice } from "@/lib/utils";
+import { intervalSuffix } from "@/lib/billing-intervals";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { getBranding } from "@/lib/branding";
@@ -139,6 +140,9 @@ export default async function ServicePreviewPage({
               <div className="flex items-baseline gap-2">
                 <span className="text-lg font-bold text-gray-900">
                   {formatPrice(displayPrice)}
+                  {service.service_type === "subscription" && (
+                    <span className="ml-1 text-sm font-medium text-gray-500">{intervalSuffix(service.billing_interval)}</span>
+                  )}
                 </span>
                 {discountedPrice !== null && (
                   <span className="text-sm text-gray-400 line-through">
