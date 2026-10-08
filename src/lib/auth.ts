@@ -1,37 +1,38 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
-import { nocodeSignin } from "./nocode/client";
 import { nocodeDb } from "./nocode/db";
 import { syncProfileContact } from "./profile-contact";
+import { checkOtp, findActiveUser, normalizeEmail } from "./otp-auth";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
+    // Sign-in is by a one-time code emailed to the person; there are no passwords.
     Credentials({
-      name: "credentials",
+      name: "email code",
       credentials: {
         email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" },
+        otp: { label: "Code", type: "text" },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) return null;
+        const email = normalizeEmail(credentials?.email);
+        const code = String(credentials?.otp || "").trim();
+        if (!email || !code) return null;
 
         try {
-          const res = await nocodeSignin(
-            credentials.email as string,
-            credentials.password as string
-          );
+          // The code is used up here, so it cannot sign anyone in a second time.
+          const checked = await checkOtp(email, code, { consume: true });
+          if (!checked.ok) return null;
 
-          if (!res.success || !res.data) return null;
+          const user = await findActiveUser(email);
+          if (!user) return null;
 
-          const user = res.data;
-          const name = [user.first_name, user.last_name].filter(Boolean).join(" ");
-
+          const name = [user.firstName, user.lastName].filter(Boolean).join(" ").replace(/\s\.$/, "");
           const systemToken = process.env.NOCODE_SYSTEM_TOKEN || "";
           const profile = await nocodeDb.userProfiles
             .findUnique({ user_id: user.id }, systemToken)
             .catch(() => null);
 
-          await syncProfileContact(profile, user);
+          await syncProfileContact(profile, { email: user.email, first_name: user.firstName, last_name: user.lastName });
 
           return {
             id: user.id,
@@ -39,9 +40,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             email: user.email,
             image: (profile?.avatar as string) || null,
             role: (profile?.role as string) || "STUDENT",
-            nocodeToken: user.jwt,
           };
-        } catch {
+        } catch (error) {
+          console.error("[auth] sign-in failed", error);
           return null;
         }
       },
@@ -52,7 +53,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (user) {
         token.id = user.id;
         token.role = (user as { role: string }).role;
-        token.nocodeToken = (user as { nocodeToken: string }).nocodeToken;
       }
       return token;
     },
@@ -60,7 +60,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (session.user) {
         session.user.id = token.id as string;
         session.user.role = token.role as string;
-        (session as { nocodeToken?: string }).nocodeToken = token.nocodeToken as string;
       }
       return session;
     },

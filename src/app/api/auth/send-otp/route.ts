@@ -1,66 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
-import { nocodeDb } from "@/lib/nocode/db";
-import { nocodeSignin, NocodeApiError } from "@/lib/nocode/client";
-import { sendEmail, otpEmail } from "@/lib/email";
-import { passwordProblem } from "@/lib/password";
+import { nocodeUserByEmail } from "@/lib/nocode/client";
+import { isEmail, issueOtp, normalizeEmail } from "@/lib/otp-auth";
+import { nameProblem } from "@/lib/account";
 
 const SYSTEM_TOKEN = process.env.NOCODE_SYSTEM_TOKEN || "";
 
+/** Sign-up for a creator: emails a code that proves the address is theirs. */
 export async function POST(req: NextRequest) {
   try {
-    const { name, email, password } = await req.json();
+    const body = await req.json();
+    const name = String(body.name || "").trim();
+    const email = normalizeEmail(body.email);
 
-    if (!name || !email || !password) {
-      return NextResponse.json({ error: "All fields are required" }, { status: 400 });
+    if (!name || !email) return NextResponse.json({ error: "Name and email are required" }, { status: 400 });
+    if (!isEmail(email)) return NextResponse.json({ error: "Enter a valid email address" }, { status: 400 });
+    const badName = nameProblem(name);
+    if (badName) return NextResponse.json({ error: badName }, { status: 400 });
+
+    if (await nocodeUserByEmail(email, SYSTEM_TOKEN)) {
+      return NextResponse.json({ error: "This email already has an account. Please sign in." }, { status: 400 });
     }
 
-    const weak = passwordProblem(password);
-    if (weak) {
-      return NextResponse.json({ error: weak }, { status: 400 });
-    }
-
-    // Check if user already exists by attempting signin
-    try {
-      await nocodeSignin(email, "___probe___");
-      // If no error, user exists (unlikely with wrong password, but handle)
-      return NextResponse.json({ error: "Email already registered" }, { status: 400 });
-    } catch (err) {
-      if (err instanceof NocodeApiError) {
-        // "Invalid credentials" means user exists; "not found" means new user
-        const msg = err.message.toLowerCase();
-        if (msg.includes("invalid") && !msg.includes("not found") && !msg.includes("not registered")) {
-          return NextResponse.json({ error: "Email already registered" }, { status: 400 });
-        }
-      }
-    }
-
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-
-    // Delete any existing unverified OTPs for this email
-    await nocodeDb.emailOtps.deleteWhere({ email }, SYSTEM_TOKEN).catch(() => {});
-
-    // Store OTP record (password stored as-is; nocode backend will hash on signup)
-    await nocodeDb.emailOtps.create(
-      {
-        email,
-        otp,
-        name,
-        password,
-        // Public signup is for creators only; students register from a service's checkout page.
-        role: "CREATOR",
-        verified: false,
-        expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
-      },
-      SYSTEM_TOKEN
-    );
-
-    const emailContent = otpEmail(name, otp);
-    await sendEmail({ to: email, ...emailContent });
-
-    return NextResponse.json({ message: "OTP sent to your email" });
+    // Public sign-up is for creators only; students register from a service's checkout page.
+    const sent = await issueOtp({ email, name, role: "CREATOR" });
+    if (!sent.ok) return NextResponse.json({ error: sent.error }, { status: sent.status });
+    return NextResponse.json({ message: "We emailed you a code" });
   } catch (error) {
     console.error("Send OTP error:", error);
-    const message = error instanceof Error ? error.message : "Failed to send OTP";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: "Could not send the code. Please try again." }, { status: 500 });
   }
 }

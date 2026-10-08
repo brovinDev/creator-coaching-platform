@@ -7,7 +7,7 @@ import Script from "next/script";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  ArrowLeft, Plus, Mail, CheckCircle, LogIn, X,
+  ArrowLeft, Plus, Mail, CheckCircle, X,
 } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
 import { buttonStyle } from "@/lib/branding-colors";
@@ -69,8 +69,9 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
   const [submitting, setSubmitting] = useState(false);
 
   const [authStep, setAuthStep] = useState<AuthStep>("form");
-  const [isExistingUser, setIsExistingUser] = useState(false);
-  const [form, setForm] = useState({ name: "", email: "", password: "" });
+  // The name is only asked for when this email has no account yet.
+  const [needsName, setNeedsName] = useState(false);
+  const [form, setForm] = useState({ name: "", email: "" });
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [resendTimer, setResendTimer] = useState(0);
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -157,13 +158,6 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
   async function handleSendOtp(e?: React.FormEvent) {
     if (e) e.preventDefault();
     if (!form.email) return;
-    if (!isExistingUser) {
-      const pw = form.password;
-      if (pw.length < 8 || !/[a-z]/.test(pw) || !/[A-Z]/.test(pw) || !/[0-9]/.test(pw) || !/[^a-zA-Z0-9]/.test(pw)) {
-        toast.error("Password needs 8+ chars with uppercase, lowercase, number & special character");
-        return;
-      }
-    }
     setSubmitting(true);
     try {
       const res = await fetch("/api/checkout/send-otp", {
@@ -171,25 +165,14 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
         body: JSON.stringify({ name: form.name, email: form.email }),
       });
       const data = await res.json();
-      if (!res.ok) toast.error(data.error || "Failed to send OTP");
+      if (data.needsName) { setNeedsName(true); toast(data.error || "Please enter your name"); }
+      else if (!res.ok) toast.error(data.error || "Failed to send OTP");
       else {
         toast.success("Verification code sent!");
         setAuthStep("otp");
         setResendTimer(60);
         setTimeout(() => otpRefs.current[0]?.focus(), 100);
       }
-    } catch { toast.error("Something went wrong"); }
-    finally { setSubmitting(false); }
-  }
-
-  async function handleLogin(e: React.FormEvent) {
-    e.preventDefault();
-    if (!form.email || !form.password) return;
-    setSubmitting(true);
-    try {
-      const result = await signIn("credentials", { email: form.email, password: form.password, redirect: false });
-      if (result?.error) toast.error("Invalid email or password");
-      else { toast.success("Signed in!"); setAuthStep("done"); }
     } catch { toast.error("Something went wrong"); }
     finally { setSubmitting(false); }
   }
@@ -201,14 +184,14 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
     try {
       const res = await fetch("/api/checkout/verify-and-register", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: form.email, otp: otpString, name: form.name, password: form.password }),
+        body: JSON.stringify({ email: form.email, otp: otpString, name: form.name }),
       });
       const data = await res.json();
       if (!res.ok) toast.error(data.error || "Verification failed");
       else {
-        const result = await signIn("credentials", { email: form.email, password: form.password, redirect: false });
-        if (result?.error) toast.error("Account created but login failed.");
-        else { toast.success("Account created!"); setAuthStep("done"); }
+        const result = await signIn("credentials", { email: form.email, otp: otpString, redirect: false });
+        if (result?.error) toast.error("Your code could not be used to sign in. Please ask for a new one.");
+        else { toast.success("You are signed in!"); setAuthStep("done"); }
       }
     } catch { toast.error("Something went wrong"); }
     finally { setSubmitting(false); }
@@ -407,38 +390,19 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
                 {/* Auth */}
                 {authStep !== "done" && (
                   <div className="mt-5 border border-gray-200 rounded-xl p-4">
-                    {authStep === "form" && !isExistingUser && (
+                    {authStep === "form" && (
                       <>
-                        <p className="text-sm font-medium text-gray-900 mb-3">Verify using email</p>
+                        <p className="text-sm font-medium text-gray-900 mb-1">Verify using email</p>
+                        <p className="text-xs text-gray-500 mb-3">We will email you a code. No password needed.</p>
                         <form onSubmit={handleSendOtp} className="space-y-3">
-                          <Input placeholder="Full Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
                           <Input type="email" placeholder="Enter your email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
-                          <Input type="password" placeholder="Create password (min 6 chars)" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required minLength={6} />
+                          {needsName && (
+                            <Input placeholder="Full Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required autoFocus />
+                          )}
                           <button type="submit" disabled={submitting} className="w-full py-3 bg-red-700 hover:bg-red-800 text-white rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 cursor-pointer">
                             {submitting ? "Sending..." : "Request OTP"}
                           </button>
                         </form>
-                        <p className="text-center text-xs text-gray-500 mt-3">
-                          OR, <button onClick={() => setIsExistingUser(true)} className="text-indigo-600 font-medium cursor-pointer">Sign in with password</button>
-                        </p>
-                      </>
-                    )}
-
-                    {authStep === "form" && isExistingUser && (
-                      <>
-                        <p className="text-sm font-medium text-gray-900 mb-3 flex items-center gap-2">
-                          <LogIn className="h-4 w-4" /> Sign in
-                        </p>
-                        <form onSubmit={handleLogin} className="space-y-3">
-                          <Input type="email" placeholder="Enter your email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
-                          <Input type="password" placeholder="Password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
-                          <button type="submit" disabled={submitting} className="w-full py-3 bg-red-700 hover:bg-red-800 text-white rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 cursor-pointer">
-                            {submitting ? "Signing in..." : "Sign In"}
-                          </button>
-                        </form>
-                        <p className="text-center text-xs text-gray-500 mt-3">
-                          OR, <button onClick={() => setIsExistingUser(false)} className="text-indigo-600 font-medium cursor-pointer">Verify using email</button>
-                        </p>
                       </>
                     )}
 
