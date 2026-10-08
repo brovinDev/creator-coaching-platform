@@ -3,6 +3,7 @@ import { nocodeDb } from "@/lib/nocode/db";
 import { Card, CardContent } from "@/components/ui/card";
 import { CreditCard, CheckCircle, Clock, XCircle, IndianRupee } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
+import { orderTitle } from "@/lib/orders";
 
 const statusConfig: Record<string, { label: string; color: string; icon: typeof CheckCircle }> = {
   paid: { label: "Paid", color: "text-green-700 bg-green-50", icon: CheckCircle },
@@ -22,11 +23,16 @@ export default async function StudentPaymentsPage() {
       new Date(String(a.created_at || a.createdAt || 0)).getTime()
   );
 
-  const courseIds = [...new Set(orders.map((o) => String(o.course_id)))];
+  // An order is for a service, or (older direct course purchases) for a course.
   const courseMap = new Map<string, Record<string, unknown>>();
-  for (const cid of courseIds) {
+  for (const cid of new Set(orders.filter((o) => !o.service_id && o.course_id).map((o) => String(o.course_id)))) {
     const course = await nocodeDb.courses.findUnique({ id: cid }, token);
     if (course) courseMap.set(cid, course);
+  }
+  const serviceMap = new Map<string, Record<string, unknown>>();
+  for (const sid of new Set(orders.filter((o) => o.service_id).map((o) => String(o.service_id)))) {
+    const service = await nocodeDb.services.findUnique({ id: sid }, token).catch(() => null);
+    if (service) serviceMap.set(sid, service);
   }
 
   const totalSpent = orders
@@ -104,13 +110,11 @@ export default async function StudentPaymentsPage() {
                 {orders.map((order) => {
                   const config = statusConfig[String(order.status)] || statusConfig.pending;
                   const StatusIcon = config.icon;
-                  const course = courseMap.get(String(order.course_id));
                   return (
                     <tr key={String(order.id)} className="hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-4">
                         <div>
-                          <p className="font-medium text-gray-900 text-sm">{String(course?.title || "")}</p>
-                          <p className="text-xs text-gray-500">by {String(course?.creator_name || "Creator")}</p>
+                          <p className="font-medium text-gray-900 text-sm">{orderTitle(order, serviceMap, courseMap)}</p>
                         </div>
                       </td>
                       <td className="px-4 py-4">
