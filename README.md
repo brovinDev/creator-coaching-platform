@@ -115,6 +115,7 @@ Open http://localhost:4000.
 | `NEXTAUTH_URL`, `NEXTAUTH_SECRET` | NextAuth. Generate the secret with `openssl rand -base64 32` |
 | `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_APP_NAME` | Public URL and brand name |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM` | Sending email (`EMAIL_FROM` defaults to `SMTP_USER`) |
+| `CRON_SECRET` | Shared secret the backend scheduler uses to call `/api/cron/reminders` (workshop reminder emails). Generate with `openssl rand -hex 32` |
 | `BEEFREE_CLIENT_ID`, `BEEFREE_CLIENT_SECRET` | Visual email editor. Without them the visual editor reports it is unavailable and the simple text editor still works |
 
 Razorpay and Cloudinary keys are **not** in this file any more. They live on the nocode org (steps 4 and 5).
@@ -126,6 +127,34 @@ Razorpay and Cloudinary keys are **not** in this file any more. They live on the
 - **Placeholders:** `{contact.firstname}`, `{contact.lastname}`, `{contact.fullname}`, `{contact.email}`, `{service.name}`, `{order.amount}`, `{order.transaction_id}`, `{creator.name}`, `{link.dashboard}`. Unknown placeholders are left as written.
 - **Beefree free plan:** the editor toolbar cannot be hidden, and Beefree's own plain-text export is paid, so plain text is generated here.
 - A creator's own email is added to their profile when they sign in, so the registration notification only reaches them after their next sign-in.
+
+## Workshop reminder emails
+
+Learners of a workshop's linked services get a reminder **24 hours**, **1 hour** and **5 minutes** before every session (single or recurring). Creators switch each one on or off under Automation > Email Automation; they are on by default.
+
+- **Who sends:** this app, over SMTP. The nocode backend only provides the clock: a scheduler job in `nocode-backend/src/open-slate/` calls `POST /api/cron/reminders` once a minute with `Authorization: Bearer <CRON_SECRET>`.
+- **Backend setup:** set `OPEN_SLATE_WEB_URL` (this app's public URL) and `OPEN_SLATE_CRON_SECRET` (same value as `CRON_SECRET` here) in the backend's `.env`, then restart it once. Without both, nothing is scheduled.
+- **At most once:** each (workshop, session, reminder) is recorded in the `workshop_reminders` module before sending, so restarts and retries never email learners twice. If the backend is down, a reminder is skipped once it is more than 10 minutes late rather than sent at the wrong time.
+- **Content:** built-in emails using the creator's email logo and theme colour. The 24 hour and 1 hour emails link to the learner's Workshops page; the 5 minute email carries the meeting link. Times are shown in the workshop's timezone.
+- **One default, two uses:** `src/lib/workshop-reminder-default.ts` generates the built-in reminder (with the creator's logo and theme colour) and the same email as a Beefree design. Learners get it until a creator saves their own, and the editor opens on exactly that design, so editing starts from what is really sent.
+- **Custom wording:** each reminder row in Email Automation has an edit button (same plain-text and visual editor as the confirmation email, saved per creator in `creator_reminder_templates`). Placeholders: `{contact.firstname}`, `{contact.lastname}`, `{contact.fullname}`, `{contact.email}`, `{workshop.title}`, `{workshop.host}`, `{workshop.date}`, `{workshop.time}`, `{workshop.starts_in}`, `{workshop.link}`, `{link.dashboard}`. `{workshop.link}` is the meeting link in the 5 minute reminder and the learner's Workshops page in the others. A custom email that is switched off, or has no subject or body, falls back to the built-in one. Reset removes it.
+- **Needs an email address:** learners only get reminders if their profile has an email, which is saved when they sign in.
+
+## Notification emails
+
+Besides the purchase confirmation and the workshop reminders, three more emails are live in Automation > Email Automation. Each has an on/off switch (on by default), an edit button (same editor as the reminders, saved in `creator_reminder_templates` under the keys `after15m`, `post_comment`, `comment_reply`), a reset button, and a default that the editor opens on.
+
+| Email | Sent to | When |
+|---|---|---|
+| Post Workshop Email 15 mins after Workshop | Learners of the workshop's linked services | 15 minutes after each session ends (same once-only claim and 10 minute lateness limit as the reminders) |
+| Notification Email on Post Comment | The author of the feed post | Someone else comments on it |
+| Notification Email on Comment Reply | The author of the comment | Someone replies to it |
+
+- Nobody is emailed about their own comment or reply. Comment emails go out only if the recipient's profile has an email address (saved when they sign in).
+- Feed comments now support replies, one level deep: a reply to a reply is filed under the original comment but notifies the person it answers.
+- Placeholders: post workshop `{contact.*}`, `{workshop.title}`, `{workshop.host}`, `{workshop.date}`, `{workshop.time}`, `{link.dashboard}`; post comment `{contact.*}`, `{commenter.name}`, `{comment.text}`, `{post.excerpt}`, `{link.feed}`; comment reply `{contact.*}`, `{replier.name}`, `{reply.text}`, `{comment.excerpt}`, `{link.feed}`.
+- The post workshop wording follows the text TagMango uses ("Hope you enjoyed your call with ... for more of ...'s content log on to ...").
+- Every comment sends one email; there is no batching or digest.
 
 ## Payment flow
 
@@ -146,8 +175,6 @@ Services that cost nothing, or reach ₹0 with a coupon, enroll through `POST /a
 | `npm run start` | Start the production build |
 | `npm run lint` | Lint |
 | `npx tsc --noEmit` | Type check |
-
-The Prisma scripts and the `prisma/` folder are left over from before the move to the nocode backend and are not used.
 
 ## Roles
 

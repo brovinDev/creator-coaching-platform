@@ -1,5 +1,6 @@
 "use client";
 
+import { PreviewLogo, buttonStyle, usePreviewBranding } from "@/components/creator/preview-logo";
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -55,6 +56,7 @@ export default function EditServicePage() {
   const router = useRouter();
   const params = useParams();
   const { data: session } = useSession();
+  const brand = usePreviewBranding();
   const serviceId = params.serviceId as string;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState<Tab>("details");
@@ -283,13 +285,12 @@ export default function EditServicePage() {
     const creatorName = session?.user?.name || APP_NAME;
     const logo = (
       <div className="flex justify-center mb-4">
-        {creatorAvatar ? (
-          <img src={creatorAvatar} alt={creatorName} className="w-12 h-12 rounded-lg object-cover" />
-        ) : (
-          <div className="w-12 h-12 rounded-lg bg-gray-900 flex items-center justify-center text-sm font-bold text-white">
-            {creatorName.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2)}
-          </div>
-        )}
+        <PreviewLogo
+          logoUrl={brand.logoUrl || creatorAvatar || ""}
+          name={brand.brandName || creatorName}
+          imgClass="w-12 h-12 rounded-lg object-cover"
+          initialsClass="w-12 h-12 rounded-lg text-sm"
+        />
       </div>
     );
 
@@ -352,7 +353,7 @@ export default function EditServicePage() {
 
           <div className="border-t border-gray-200 p-3 flex items-center justify-between bg-white">
             <span className="text-sm font-bold">&#8377;{totalAmount}</span>
-            <button className="bg-gray-900 text-white px-4 py-1.5 rounded-lg text-xs font-medium">
+            <button style={buttonStyle(brand.themeColor)} className="px-4 py-1.5 rounded-lg text-xs font-medium">
               Pay Now
             </button>
           </div>
@@ -366,13 +367,12 @@ export default function EditServicePage() {
           <div className="flex-1 overflow-y-auto bg-gray-100">
             {/* Logo */}
             <div className="flex justify-center pt-4 pb-0">
-              {creatorAvatar ? (
-                <img src={creatorAvatar} alt={creatorName} className="w-10 h-10 rounded-lg object-cover relative z-10" />
-              ) : (
-                <div className="w-10 h-10 rounded-lg bg-gray-900 flex items-center justify-center text-[10px] font-bold text-white relative z-10">
-                  {creatorName.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2)}
-                </div>
-              )}
+              <PreviewLogo
+                logoUrl={brand.logoUrl || creatorAvatar || ""}
+                name={brand.brandName || creatorName}
+                imgClass="w-10 h-10 rounded-lg object-cover relative z-10"
+                initialsClass="w-10 h-10 rounded-lg text-[10px] relative z-10"
+              />
             </div>
 
             {/* Green success banner */}
@@ -434,7 +434,7 @@ export default function EditServicePage() {
           {/* Login Now bottom bar */}
           {!(successConfig.customButton && successConfig.hideButton) && (
             <div className="p-3 bg-gray-100">
-              <button className="w-full py-2.5 bg-gray-900 text-white rounded-xl text-xs font-semibold">
+              <button style={buttonStyle(brand.themeColor)} className="w-full py-2.5 rounded-xl text-xs font-semibold">
                 {successConfig.customButton ? (successConfig.customButtonText || "Login Now") : "Login Now"}
               </button>
             </div>
@@ -478,7 +478,7 @@ export default function EditServicePage() {
               <span className="text-xs text-gray-400 line-through ml-1">&#8377;{displayPrice}</span>
             )}
           </span>
-          <button className="bg-gray-900 text-white px-5 py-2 rounded-lg text-sm font-medium">
+          <button style={buttonStyle(brand.themeColor)} className="px-5 py-2 rounded-lg text-sm font-medium">
             {serviceType === "free" ? "Register" : "Buy Now"}
           </button>
         </div>

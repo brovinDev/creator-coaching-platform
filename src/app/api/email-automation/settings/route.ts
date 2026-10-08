@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getNocodeToken } from "@/lib/auth";
 import { nocodeDb } from "@/lib/nocode/db";
 import { isValidEmail, requireCreator } from "@/lib/email-automation";
+import { LIVE_EMAILS } from "@/lib/email-notifications";
+import { contentFromRow } from "@/lib/email-template-render";
 
 export async function GET() {
   const creator = await requireCreator();
@@ -9,11 +11,24 @@ export async function GET() {
 
   const token = await getNocodeToken();
   const row = await nocodeDb.creatorEmailSettings.findUnique({ creator_id: creator.user.id }, token);
+  // Which reminders have the creator's own wording in use (written, and not switched off).
+  const templates = await nocodeDb.creatorReminderTemplates
+    .findMany({ where: { creator_id: creator.user.id } }, token)
+    .catch(() => []);
+  const custom = Object.fromEntries(
+    LIVE_EMAILS.map((r) => [
+      r.key,
+      templates.some((t) => t.reminder === r.key && t.enabled !== false && !!contentFromRow(t, "")),
+    ])
+  );
   return NextResponse.json({
+    reminder_custom: custom,
     from_name: String(row?.from_name || ""),
     reply_to: String(row?.reply_to || ""),
     // Unset means on.
     confirmation_enabled: row?.confirmation_enabled !== false,
+    // Workshop reminders, also on unless switched off.
+    ...Object.fromEntries(LIVE_EMAILS.map((e) => [e.setting, row?.[e.setting] !== false])),
   });
 }
 
@@ -36,6 +51,9 @@ export async function PUT(req: NextRequest) {
     data.reply_to = replyTo;
   }
   if (typeof body.confirmation_enabled === "boolean") data.confirmation_enabled = body.confirmation_enabled;
+  for (const email of LIVE_EMAILS) {
+    if (typeof body[email.setting] === "boolean") data[email.setting] = body[email.setting];
+  }
 
   const token = await getNocodeToken();
   try {

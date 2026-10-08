@@ -1,5 +1,6 @@
 "use client";
 
+import { PreviewLogo, buttonStyle, usePreviewBranding } from "@/components/creator/preview-logo";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -48,6 +49,7 @@ const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME || "Open Slate";
 export default function CreateServicePage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const brand = usePreviewBranding();
   const [activeTab, setActiveTab] = useState<Tab>("details");
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -189,9 +191,12 @@ export default function CreateServicePage() {
   function renderPreview() {
     const logo = (
       <div className="flex justify-center mb-4">
-        <div className="w-12 h-12 rounded-lg bg-gray-900 flex items-center justify-center text-sm font-bold text-white">
-          {APP_NAME.slice(0, 2).toUpperCase()}
-        </div>
+        <PreviewLogo
+          logoUrl={brand.logoUrl}
+          name={brand.brandName || APP_NAME}
+          imgClass="w-12 h-12 rounded-lg object-cover"
+          initialsClass="w-12 h-12 rounded-lg text-sm"
+        />
       </div>
     );
 
@@ -254,7 +259,7 @@ export default function CreateServicePage() {
 
           <div className="border-t border-gray-200 p-3 flex items-center justify-between bg-white">
             <span className="text-sm font-bold">&#8377;{totalAmount}</span>
-            <button className="bg-gray-900 text-white px-4 py-1.5 rounded-lg text-xs font-medium">
+            <button style={buttonStyle(brand.themeColor)} className="px-4 py-1.5 rounded-lg text-xs font-medium">
               Pay Now
             </button>
           </div>
@@ -268,9 +273,12 @@ export default function CreateServicePage() {
           <div className="flex-1 overflow-y-auto bg-gray-100">
             {/* Logo */}
             <div className="flex justify-center pt-4 pb-0">
-              <div className="w-10 h-10 rounded-lg bg-gray-900 flex items-center justify-center text-[10px] font-bold text-white relative z-10">
-                {APP_NAME.slice(0, 2).toUpperCase()}
-              </div>
+              <PreviewLogo
+                logoUrl={brand.logoUrl}
+                name={brand.brandName || APP_NAME}
+                imgClass="w-10 h-10 rounded-lg object-cover relative z-10"
+                initialsClass="w-10 h-10 rounded-lg text-[10px] relative z-10"
+              />
             </div>
 
             {/* Green success banner */}
@@ -317,7 +325,7 @@ export default function CreateServicePage() {
 
           {/* Login Now bottom bar */}
           <div className="p-3 bg-gray-100">
-            <button className="w-full py-2.5 bg-gray-900 text-white rounded-xl text-xs font-semibold">
+            <button style={buttonStyle(brand.themeColor)} className="w-full py-2.5 rounded-xl text-xs font-semibold">
               {successConfig.customButton ? (successConfig.customButtonText || "Login Now") : "Login Now"}
             </button>
           </div>
@@ -360,7 +368,7 @@ export default function CreateServicePage() {
               <span className="text-xs text-gray-400 line-through ml-1">&#8377;{displayPrice}</span>
             )}
           </span>
-          <button className="bg-gray-900 text-white px-5 py-2 rounded-lg text-sm font-medium">
+          <button style={buttonStyle(brand.themeColor)} className="px-5 py-2 rounded-lg text-sm font-medium">
             {serviceType === "free" ? "Register" : "Buy Now"}
           </button>
         </div>

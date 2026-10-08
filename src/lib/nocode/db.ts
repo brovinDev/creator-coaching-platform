@@ -28,6 +28,13 @@ export const MODULES = {
   coupons: "coupons",
   service_email_templates: "service_email_templates",
   creator_email_settings: "creator_email_settings",
+  creator_branding: "creator_branding",
+  feed_posts: "feed_posts",
+  feed_likes: "feed_likes",
+  feed_replies: "feed_replies",
+  workshops: "workshops",
+  workshop_reminders: "workshop_reminders",
+  creator_reminder_templates: "creator_reminder_templates",
 } as const;
 
 type Row = Record<string, unknown>;
@@ -145,4 +152,11 @@ export const nocodeDb = {
   coupons: new NocodeModel(MODULES.coupons),
   serviceEmailTemplates: new NocodeModel(MODULES.service_email_templates),
   creatorEmailSettings: new NocodeModel(MODULES.creator_email_settings),
+  creatorBranding: new NocodeModel(MODULES.creator_branding),
+  feedPosts: new NocodeModel(MODULES.feed_posts),
+  feedLikes: new NocodeModel(MODULES.feed_likes),
+  feedComments: new NocodeModel(MODULES.feed_replies),
+  workshops: new NocodeModel(MODULES.workshops),
+  workshopReminders: new NocodeModel(MODULES.workshop_reminders),
+  creatorReminderTemplates: new NocodeModel(MODULES.creator_reminder_templates),
 };

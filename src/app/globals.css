@@ -36,3 +36,21 @@ label[for] {
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
   background: #9ca3af;
 }
+
+/*
+ * The creator's theme colour. The indigo scale is derived from --brand, so every indigo
+ * class in the app follows the theme. Layouts set --brand (see ThemeScope); with none set,
+ * this is the default indigo.
+ */
+@theme inline {
+  --color-indigo-50: color-mix(in srgb, var(--brand, #4f46e5) 8%, white);
+  --color-indigo-100: color-mix(in srgb, var(--brand, #4f46e5) 16%, white);
+  --color-indigo-200: color-mix(in srgb, var(--brand, #4f46e5) 30%, white);
+  --color-indigo-300: color-mix(in srgb, var(--brand, #4f46e5) 50%, white);
+  --color-indigo-400: color-mix(in srgb, var(--brand, #4f46e5) 70%, white);
+  --color-indigo-500: color-mix(in srgb, var(--brand, #4f46e5) 88%, white);
+  --color-indigo-600: var(--brand, #4f46e5);
+  --color-indigo-700: color-mix(in srgb, var(--brand, #4f46e5) 85%, black);
+  --color-indigo-800: color-mix(in srgb, var(--brand, #4f46e5) 70%, black);
+  --color-indigo-900: color-mix(in srgb, var(--brand, #4f46e5) 55%, black);
+}

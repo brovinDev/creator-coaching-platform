@@ -8,6 +8,8 @@ import toast from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { BEEFREE_MERGE_TAGS, EMAIL_PLACEHOLDERS, placeholderToken } from "@/lib/email-merge-tags";
+import { emailKindInfo, mergeTagsFor, type EmailKind } from "@/lib/email-notifications";
+import { REMINDER_STARTER_BODY, REMINDER_STARTER_SUBJECT } from "@/lib/workshop-reminder-schedule";
 
 const LIST_URL = "/creator/automation/email";
 const BUILDER_ID = "service-email-builder";
@@ -34,6 +36,8 @@ interface Saved {
   /** A visual design is already stored for this email. */
   hasDesign: boolean;
   designJson: string | null;
+  /** HTML of the default design when nothing is saved yet (workshop reminders). */
+  defaultHtml: string | null;
 }
 
 interface DesignerSession {
@@ -59,11 +63,13 @@ function parseDesign(raw: string | null): IEntityContentJson {
 /** The Beefree builder. Only mounted once the creator opens the designer, so plain-text emails never start a session. */
 function DesignerPane({
   session,
+  mergeTags,
   onSaved,
   onApi,
   onError,
 }: {
   session: DesignerSession;
+  mergeTags: typeof BEEFREE_MERGE_TAGS;
   onSaved: (designJson: string, html: string) => void;
   onApi: (api: DesignerApi) => void;
   onError: (err: unknown) => void;
@@ -72,7 +78,7 @@ function DesignerPane({
     uid: session.uid,
     container: BUILDER_ID,
     language: "en-US",
-    mergeTags: BEEFREE_MERGE_TAGS,
+    mergeTags,
   });
 
   useEffect(() => {
@@ -96,11 +102,20 @@ function DesignerPane({
  * designed (HTML) one from the visual designer. `format` picks what learners receive; a designed
  * email always carries a plain-text part, either the text written here or one made from the design.
  *
- * With a serviceId it edits that service's email; without one, the creator's default.
+ * With a serviceId it edits that service's email; with a reminder, that workshop reminder
+ * (24h / 1h / 5m); with neither, the creator's default confirmation email.
  */
-export default function EmailEditor({ serviceId }: { serviceId?: string }) {
+export default function EmailEditor({ serviceId, reminder }: { serviceId?: string; reminder?: EmailKind }) {
   const router = useRouter();
-  const base = serviceId ? `/api/services/${serviceId}/email-template` : "/api/email-automation/default-template";
+  const base = reminder
+    ? `/api/email-automation/reminders/${reminder}`
+    : serviceId
+      ? `/api/services/${serviceId}/email-template`
+      : "/api/email-automation/default-template";
+  const reminderInfo = reminder ? emailKindInfo(reminder) : undefined;
+  const placeholders = reminderInfo ? reminderInfo.placeholders : EMAIL_PLACEHOLDERS;
+  const starterSubject = reminder ? REMINDER_STARTER_SUBJECT : STARTER_SUBJECT;
+  const starterBody = reminder ? REMINDER_STARTER_BODY : STARTER_BODY;
 
   const [saved, setSaved] = useState<Saved | null>(null);
   const [loadError, setLoadError] = useState("");
@@ -129,42 +144,49 @@ export default function EmailEditor({ serviceId }: { serviceId?: string }) {
         const res = await fetch(base);
         if (!res.ok) throw new Error("Could not load the saved email");
         const data = await res.json();
-        const hasDesign = !!data.exists && (data.format === "html" || !!data.design_json);
-        setSaved({
+        // Nothing saved but a default design offered: start on that design, ready to save as it is.
+        const isDefault = !data.exists && !!data.default_html;
+        const hasDesign = isDefault || (!!data.exists && (data.format === "html" || !!data.design_json));
+        const next: Saved = {
           serviceTitle: data.service_title || "",
           exists: !!data.exists,
           enabled: !!data.enabled,
           hasDesign,
           designJson: data.design_json || null,
-        });
-        setSubject(data.subject || STARTER_SUBJECT);
-        setFormat(data.exists ? data.format : "text");
+          defaultHtml: isDefault ? data.default_html : null,
+        };
+        setSaved(next);
+        setSubject(data.subject || starterSubject);
+        setFormat(data.exists || isDefault ? data.format : "text");
         // Nothing written yet: start from a sensible message, not a blank box. A designed email may
         // deliberately have no text of its own (one is generated from the design).
-        setBody(data.body_text || (data.exists && data.format === "html" ? "" : STARTER_BODY));
+        setBody(data.body_text || ((data.exists || isDefault) && data.format === "html" ? "" : starterBody));
+        if (isDefault) void openDesigner(next);
       } catch (err) {
         setLoadError(err instanceof Error ? err.message : "Could not load the email");
       }
     }
     load();
-  }, [base]);
+  // openDesigner only reads state that load() has just handed it, so it is deliberately not a dependency.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [base, starterSubject, starterBody]);
 
-  async function openDesigner() {
+  async function openDesigner(current: Saved | null = saved) {
     setTab("design");
-    if (designer || designerLoading || !saved) return;
+    if (designer || designerLoading || !current) return;
     setDesignerLoading(true);
     try {
       const res = await fetch("/api/email-builder/token", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ serviceId }),
+        body: JSON.stringify({ serviceId, reminder }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || "Could not load the email builder");
       }
       const { uid, ...token } = await res.json();
-      setDesigner({ token: token as IToken, uid, template: parseDesign(saved.designJson) });
+      setDesigner({ token: token as IToken, uid, template: parseDesign(current.designJson) });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not load the email builder");
       setTab("text");
@@ -209,21 +231,24 @@ export default function EmailEditor({ serviceId }: { serviceId?: string }) {
   async function persist(design?: { designJson: string; html: string }) {
     const { subject, body, format, saved } = latest.current;
     if (!saved) return;
+    // Saving the default design untouched still has to store it.
+    const stored = design ?? (!saved.exists && saved.defaultHtml && saved.designJson ? { designJson: saved.designJson, html: saved.defaultHtml } : undefined);
     await sendJson(base, "PUT", {
       subject,
       body_text: body,
       format,
-      ...(design ? { design_json: design.designJson, html: design.html } : {}),
+      ...(stored ? { design_json: stored.designJson, html: stored.html } : {}),
       // A first email turns itself on; after that the switch on the list page decides.
       enabled: saved.exists ? saved.enabled : true,
     });
-    setSaved({ ...saved, exists: true, enabled: saved.exists ? saved.enabled : true, hasDesign: saved.hasDesign || !!design });
+    setSaved({ ...saved, exists: true, enabled: saved.exists ? saved.enabled : true, hasDesign: saved.hasDesign || !!stored, defaultHtml: null });
     toast.success("Email saved");
   }
 
   async function sendTest(html?: string) {
-    const { subject, body, format } = latest.current;
-    const data = await sendJson(`${base}/test`, "POST", { subject, format, body_text: body, ...(html ? { html } : {}) });
+    const { subject, body, format, saved } = latest.current;
+    const testHtml = html ?? (!saved?.exists && format === "html" ? saved?.defaultHtml ?? undefined : undefined);
+    const data = await sendJson(`${base}/test`, "POST", { subject, format, body_text: body, ...(testHtml ? { html: testHtml } : {}) });
     toast.success(data.message || "Test email sent");
   }
 
@@ -285,9 +310,11 @@ export default function EmailEditor({ serviceId }: { serviceId?: string }) {
     }
   }
 
-  const title = serviceId
-    ? `Confirmation Email on Service Purchase${saved?.serviceTitle ? ` · ${saved.serviceTitle}` : ""}`
-    : "Confirmation Email on Service Purchase · Default for all services";
+  const title = reminderInfo
+    ? reminderInfo.label
+    : serviceId
+      ? `Confirmation Email on Service Purchase${saved?.serviceTitle ? ` · ${saved.serviceTitle}` : ""}`
+      : "Confirmation Email on Service Purchase · Default for all services";
 
   return (
     <div className="fixed inset-0 z-[60] flex flex-col bg-gray-100">
@@ -335,9 +362,15 @@ export default function EmailEditor({ serviceId }: { serviceId?: string }) {
       ) : (
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
           <aside className="w-full shrink-0 space-y-5 bg-white p-4 lg:w-96 lg:overflow-y-auto">
-            {!serviceId && (
+            {!serviceId && !reminder && (
               <p className="rounded-lg bg-gray-50 p-3 text-xs text-gray-600">
                 Services without their own email use this one. A service&apos;s own email always takes priority.
+              </p>
+            )}
+            {reminder && (
+              <p className="rounded-lg bg-gray-50 p-3 text-xs text-gray-600">
+                {reminderInfo?.description} Until you save your own version, the built-in email is sent. Turn it on or off
+                from the list page.
               </p>
             )}
 
@@ -407,7 +440,7 @@ export default function EmailEditor({ serviceId }: { serviceId?: string }) {
                   : "Click one to copy it, or pick one from the designer's merge tags menu."}
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
-                {EMAIL_PLACEHOLDERS.map((p) => (
+                {placeholders.map((p) => (
                   <button
                     key={p.key}
                     type="button"
@@ -486,6 +519,7 @@ export default function EmailEditor({ serviceId }: { serviceId?: string }) {
               {designer && (
                 <DesignerPane
                   session={designer}
+                  mergeTags={reminder ? mergeTagsFor(reminder) : BEEFREE_MERGE_TAGS}
                   onSaved={handleDesignSaved}
                   onApi={(api) => (designerApi.current = api)}
                   onError={(err) => {

@@ -32,7 +32,7 @@ courses, course_modules, lessons, lesson_progress, enrollments, orders, landing_
 `scripts/setup-nocode-modules.ts` — Run with `npx tsx scripts/setup-nocode-modules.ts` to create all modules in the nocode backend.
 
 ## Nocode Backend
-Located at `../nocode-backend/` (sibling folder). Repo: `https://github.com/nbitspace01/nocode-backend.git`, branch: `app/open-slate/main`.
+Located at `../nocode-backend/` (sibling folder). Branch: `app/open-slate/main`. Its Open Slate code lives in `src/open-slate/` (see the README there). Remotes: `origin` = `https://github.com/nbitspace01/openslate-web-backend.git`, `aaga` = `https://github.com/nbitspace01/nocode-backend.git`. The branch has no upstream set, so push with the remote named: `git push origin app/open-slate/main`.
 - Express.js + TypeORM + PostgreSQL
 - Multi-tenant (appId/orgId)
 - Auth: POST `/api/:appId/auth/signin` returns `{success, data: {id, first_name, last_name, email, jwt, organizations}}`
@@ -67,14 +67,10 @@ NEXT_PUBLIC_APP_URL, NEXT_PUBLIC_APP_NAME
 - `NOCODE_SYSTEM_TOKEN` used for server-to-server calls without user session (public routes, email sending)
 - Field names use snake_case in nocode (e.g., `course_id`, `creator_id`, `video_url`)
 - Content fields (landing page sections) stored as JSON strings in nocode
-- Prisma packages still in package.json but unused — safe to remove
 
 ## Git Remotes (web app)
-- `origin` = `https://github.com/brovinDev/creator-coaching-platform.git`
-- `aaga` = `https://github.com/nbitspace01/upskill.git`
+- `origin` = `https://github.com/nbitspace01/openslate-web-app.git` (the company repository; the branch `feat/web-services-and-fixes` tracks it)
+- `brovin` = `https://github.com/brovinDev/creator-coaching-platform.git` (personal; `main` tracks it)
 
 ## Pending Cleanup
-- Remove Prisma dependencies from package.json (`@prisma/client`, `@prisma/adapter-pg`, `prisma`)
-- Remove `prisma/` directory (schema, seed, migrations)
-- Remove Prisma-related npm scripts from package.json
 - Remove `bcryptjs` dependency (no longer used after nocode migration)

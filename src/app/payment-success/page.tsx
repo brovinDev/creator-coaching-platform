@@ -1,5 +1,7 @@
 "use client";
 
+import { buttonStyle } from "@/lib/branding-colors";
+import { ThemeScope } from "@/components/theme-scope";
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -26,6 +28,7 @@ function PaymentSuccessContent() {
   const [copied, setCopied] = useState(false);
   const [successConfig, setSuccessConfig] = useState<SuccessConfig | null>(null);
   const [creatorLogo, setCreatorLogo] = useState<string | null>(null);
+  const [themeColor, setThemeColor] = useState("");
   const [creatorInitials, setCreatorInitials] = useState(APP_NAME.slice(0, 2).toUpperCase());
   const [redirectCountdown, setRedirectCountdown] = useState<number | null>(null);
 
@@ -52,6 +55,7 @@ function PaymentSuccessContent() {
       .then((r) => r.json())
       .then((s) => {
         if (s.creator?.logo) setCreatorLogo(s.creator.logo);
+        if (s.branding?.themeColor) setThemeColor(s.branding.themeColor);
         if (s.creator?.name) {
           setCreatorInitials(s.creator.name.split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2));
         }
@@ -112,7 +116,7 @@ function PaymentSuccessContent() {
   const buttonUrl = successConfig?.customButton ? (successConfig.customButtonUrl || "/student") : "/student";
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center px-4 py-8">
+    <ThemeScope color={themeColor} className="min-h-screen bg-gray-100 flex items-center justify-center px-4 py-8">
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="flex justify-center mb-0">
@@ -186,14 +190,15 @@ function PaymentSuccessContent() {
           {showButton && (
             <Link
               href={buttonUrl}
-              className="mt-6 block w-full py-3.5 bg-gray-900 text-white rounded-xl text-center text-base font-semibold hover:bg-gray-800 transition-colors"
+              style={buttonStyle(themeColor)}
+              className="mt-6 block w-full py-3.5 rounded-xl text-center text-base font-semibold hover:opacity-90 transition-opacity"
             >
               {buttonText}
             </Link>
           )}
         </div>
       </div>
-    </div>
+    </ThemeScope>
   );
 }
 
