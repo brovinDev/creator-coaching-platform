@@ -30,7 +30,8 @@ export async function POST(req: NextRequest) {
 
     const nameParts = (record.name as string).split(" ");
     const firstName = nameParts[0] || (record.name as string);
-    const lastName = nameParts.slice(1).join(" ") || "";
+    // The nocode backend rejects an empty last name, so single-word names get a placeholder.
+    const lastName = nameParts.slice(1).join(" ") || "-";
 
     // Create user in nocode backend
     try {
