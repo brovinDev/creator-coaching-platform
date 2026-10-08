@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (order.status === "paid") {
-      const course = await nocodeDb.courses.findUnique({ id: String(order.course_id) }, SYSTEM_TOKEN);
+      const course = order.course_id ? await nocodeDb.courses.findUnique({ id: String(order.course_id) }, SYSTEM_TOKEN) : null;
       return NextResponse.json({ message: "Payment already processed", courseSlug: course?.slug });
     }
 
@@ -73,7 +73,8 @@ export async function POST(req: NextRequest) {
 
     if (order.coupon_id) await redeemCoupon(String(order.coupon_id));
 
-    const course = await nocodeDb.courses.findUnique({ id: String(order.course_id) }, SYSTEM_TOKEN);
+    // A service order has no course of its own; only an older direct course purchase does.
+    const course = order.course_id ? await nocodeDb.courses.findUnique({ id: String(order.course_id) }, SYSTEM_TOKEN) : null;
     const service = serviceId
       ? await nocodeDb.services.findUnique({ id: serviceId }, SYSTEM_TOKEN)
       : null;
@@ -94,7 +95,7 @@ export async function POST(req: NextRequest) {
           ? { name: session?.user?.name, email: session?.user?.email }
           : undefined,
         serviceId,
-        courseId: String(order.course_id),
+        courseId: order.course_id ? String(order.course_id) : null,
         amount,
         transactionId: razorpayPaymentId,
       })

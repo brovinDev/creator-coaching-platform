@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { CreditCard } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { formatPrice } from "@/lib/utils";
+import { orderTitle, ordersOfCreator } from "@/lib/orders";
 
 export default async function PaymentsPage() {
   const session = await auth();
@@ -15,9 +16,12 @@ export default async function PaymentsPage() {
   );
   const courseIds = new Set(courses.map((c) => String(c.id)));
 
+  const services = await nocodeDb.services.findMany({ where: { creator_id: session!.user.id } }, token);
+  const serviceIds = new Set(services.map((s) => String(s.id)));
+  const serviceMap = new Map(services.map((s) => [String(s.id), s as Record<string, unknown>]));
+
   const allOrders = await nocodeDb.orders.findMany({}, token);
-  const orders = allOrders
-    .filter((o) => courseIds.has(String(o.course_id)))
+  const orders = ordersOfCreator(allOrders, serviceIds, courseIds)
     .sort(
       (a, b) =>
         new Date(String(b.created_at || b.createdAt || 0)).getTime() -
@@ -51,7 +55,6 @@ export default async function PaymentsPage() {
               </thead>
               <tbody>
                 {orders.map((order) => {
-                  const course = courseMap.get(String(order.course_id));
                   return (
                     <tr key={String(order.id)} className="hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4">
@@ -60,7 +63,7 @@ export default async function PaymentsPage() {
                           <p className="text-xs text-gray-500">{String(order.user_email || "")}</p>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-gray-700">{String(course?.title || "")}</td>
+                      <td className="px-6 py-4 text-gray-700">{orderTitle(order, serviceMap, courseMap)}</td>
                       <td className="px-6 py-4 font-medium">{formatPrice(Number(order.amount))}</td>
                       <td className="px-6 py-4">
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
