@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import toast from "react-hot-toast";
+import { passwordProblem } from "@/lib/password";
 
 function ResetPasswordForm() {
   const router = useRouter();
@@ -24,8 +25,9 @@ function ResetPasswordForm() {
       return;
     }
 
-    if (password.length < 6) {
-      toast.error("Password must be at least 6 characters");
+    const weak = passwordProblem(password);
+    if (weak) {
+      toast.error(weak);
       return;
     }
 

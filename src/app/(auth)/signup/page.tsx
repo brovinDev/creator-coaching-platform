@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowLeft, Mail } from "lucide-react";
 import toast from "react-hot-toast";
+import { PASSWORD_HINT, passwordProblem } from "@/lib/password";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -31,8 +32,9 @@ export default function SignupPage() {
 
   async function handleSendOtp(e?: React.FormEvent) {
     if (e) e.preventDefault();
-    if (form.password.length < 6) {
-      toast.error("Password must be at least 6 characters");
+    const weak = passwordProblem(form.password);
+    if (weak) {
+      toast.error(weak);
       return;
     }
     setLoading(true);
@@ -221,8 +223,9 @@ export default function SignupPage() {
             value={form.password}
             onChange={(e) => setForm({ ...form, password: e.target.value })}
             required
-            minLength={6}
+            minLength={8}
           />
+          <p className="-mt-3 text-xs text-gray-500">{PASSWORD_HINT}</p>
 
           <Button type="submit" className="w-full" loading={loading}>
             Continue

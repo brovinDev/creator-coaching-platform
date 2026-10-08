@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { nocodeDb } from "@/lib/nocode/db";
 import { nocodeSignup, nocodeActivateUser, nocodeSignin } from "@/lib/nocode/client";
 import { sendEmail } from "@/lib/email";
+import { passwordProblem } from "@/lib/password";
 
 const SYSTEM_TOKEN = process.env.NOCODE_SYSTEM_TOKEN || "";
 
@@ -13,8 +14,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "All fields are required" }, { status: 400 });
     }
 
-    if (password.length < 6) {
-      return NextResponse.json({ error: "Password must be at least 6 characters" }, { status: 400 });
+    const weak = passwordProblem(password);
+    if (weak) {
+      return NextResponse.json({ error: weak }, { status: 400 });
     }
 
     const records = await nocodeDb.emailOtps.findMany(

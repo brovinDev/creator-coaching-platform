@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { nocodeDb } from "@/lib/nocode/db";
-import { nocodeSignup, nocodeActivateUser } from "@/lib/nocode/client";
+import { nocodeSignup, nocodeActivateUser, NocodeApiError } from "@/lib/nocode/client";
 import { sendEmail, welcomeEmail } from "@/lib/email";
 
 const SYSTEM_TOKEN = process.env.NOCODE_SYSTEM_TOKEN || "";
@@ -102,6 +102,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ message: "Email verified! You can now sign in." });
   } catch (error) {
     console.error("Verify OTP error:", error);
+    // The backend refused the sign-up for a reason the person can act on (a weak password, an app
+    // that is not open for sign-up). Say so instead of a blank "Verification failed".
+    if (error instanceof NocodeApiError && error.status >= 400 && error.status < 500) {
+      return NextResponse.json({ error: error.message || "Verification failed" }, { status: 400 });
+    }
     return NextResponse.json({ error: "Verification failed" }, { status: 500 });
   }
 }

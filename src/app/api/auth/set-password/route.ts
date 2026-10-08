@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { nocodeSignin, nocodeResetPassword } from "@/lib/nocode/client";
+import { passwordProblem } from "@/lib/password";
 
 export async function POST(req: NextRequest) {
   try {
@@ -9,8 +10,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Email and password are required" }, { status: 400 });
     }
 
-    if (password.length < 6) {
-      return NextResponse.json({ error: "Password must be at least 6 characters" }, { status: 400 });
+    const weak = passwordProblem(password);
+    if (weak) {
+      return NextResponse.json({ error: weak }, { status: 400 });
     }
 
     // In the nocode backend, setting a password for an existing user
