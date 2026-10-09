@@ -89,7 +89,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pos
       const emailContent = communityReplyEmail(
         (authorProfile.name as string) || "User",
         (post.title as string) || "your post",
-        `${process.env.NEXT_PUBLIC_APP_URL}/student/community`
+        `${process.env.NEXT_PUBLIC_APP_URL}/community`
       );
       sendEmail({ to: authorProfile.email as string, ...emailContent });
     }

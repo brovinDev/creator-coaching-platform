@@ -38,14 +38,14 @@ export async function notifyFeedComment(input: {
       .trim();
     const { first } = splitName(name);
     const app = process.env.NEXT_PUBLIC_APP_URL;
-    const side = profile?.role === "CREATOR" ? "creator" : "student";
+    const isCreator = profile?.role === "CREATOR";
 
     const common = {
       "contact.firstname": first || "there",
       "contact.fullname": name || "there",
       "contact.email": email,
-      "link.feed": `${app}/${side}/feed`,
-      "link.dashboard": `${app}/${side === "creator" ? "creator" : "student"}`,
+      "link.feed": `${app}${isCreator ? "/creator" : ""}/feed`,
+      "link.dashboard": `${app}${isCreator ? "/creator" : "/courses"}`,
     };
 
     if (repliedTo) {

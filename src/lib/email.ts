@@ -91,7 +91,7 @@ export function paymentConfirmationEmail(name: string, courseName: string, amoun
         <h1 style="color: #1a1a1a;">Payment Confirmed!</h1>
         <p>Hi ${name}, your payment of ₹${amount} for <strong>${courseName}</strong> has been confirmed.</p>
         <p>You now have full access to the course.</p>
-        <a href="${process.env.NEXT_PUBLIC_APP_URL}/student/courses" style="display: inline-block; padding: 12px 24px; background: #6366f1; color: white; text-decoration: none; border-radius: 6px;">Start Learning</a>
+        <a href="${process.env.NEXT_PUBLIC_APP_URL}/courses" style="display: inline-block; padding: 12px 24px; background: #6366f1; color: white; text-decoration: none; border-radius: 6px;">Start Learning</a>
       </div>
     `,
   };
@@ -104,7 +104,7 @@ export function enrollmentEmail(name: string, courseName: string) {
       <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
         <h1 style="color: #1a1a1a;">You're In!</h1>
         <p>Hi ${name}, you've been enrolled in <strong>${courseName}</strong>.</p>
-        <a href="${process.env.NEXT_PUBLIC_APP_URL}/student/courses" style="display: inline-block; padding: 12px 24px; background: #6366f1; color: white; text-decoration: none; border-radius: 6px;">Access Course</a>
+        <a href="${process.env.NEXT_PUBLIC_APP_URL}/courses" style="display: inline-block; padding: 12px 24px; background: #6366f1; color: white; text-decoration: none; border-radius: 6px;">Access Course</a>
       </div>
     `,
   };
@@ -206,7 +206,7 @@ export function serviceRegistrationEmail(input: ServiceRegistrationEmailInput) {
         ${receipt}
         ${startsLater ? `<p>This service starts on <strong>${startsLater}</strong>.</p>` : ""}
         <p>Sign in to ${appName} to access everything included in your registration.</p>
-        <a href="${appUrl}/student" style="display: inline-block; padding: 12px 24px; background: ${escapeHtml(input.buttonColor || "#6366f1")}; color: ${escapeHtml(readableTextColor(input.buttonColor || "#6366f1"))}; text-decoration: none; border-radius: 6px;">Go to my dashboard</a>
+        <a href="${appUrl}/courses" style="display: inline-block; padding: 12px 24px; background: ${escapeHtml(input.buttonColor || "#6366f1")}; color: ${escapeHtml(readableTextColor(input.buttonColor || "#6366f1"))}; text-decoration: none; border-radius: 6px;">Go to my dashboard</a>
       </div>
     `,
   };

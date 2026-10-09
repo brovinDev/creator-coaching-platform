@@ -34,15 +34,15 @@ const CREATOR_TABS: Tab[] = [
 ];
 
 const STUDENT_TABS: Tab[] = [
-  { label: "Feed", href: "/student/feed", icon: Compass },
-  { label: "Workshops", href: "/student/workshops", icon: Video },
-  { label: "Courses", href: "/student", icon: BookOpen, exact: true },
+  { label: "Feed", href: "/feed", icon: Compass },
+  { label: "Workshops", href: "/workshops", icon: Video },
+  { label: "Courses", href: "/courses", icon: BookOpen, exact: true },
 ];
 
 const STUDENT_MENU_LINKS = [
-  { label: "Payments", href: "/student/payments", icon: CreditCard },
-  { label: "Community", href: "/student/community", icon: MessageSquare },
-  { label: "Profile", href: "/student/profile", icon: User },
+  { label: "Payments", href: "/payments", icon: CreditCard },
+  { label: "Community", href: "/community", icon: MessageSquare },
+  { label: "Profile", href: "/profile", icon: User },
 ];
 
 export interface TopNavProps {
@@ -100,7 +100,7 @@ export function TopNav({ role, user, logoUrl, brandName }: TopNavProps) {
   const isCreator = role === "CREATOR";
   const tabs = isCreator ? CREATOR_TABS : STUDENT_TABS;
   const appName = brandName || process.env.NEXT_PUBLIC_APP_NAME || "Open Slate";
-  const home = isCreator ? "/creator" : "/student";
+  const home = isCreator ? "/creator" : "/courses";
 
   return (
     <header className="sticky top-0 z-30 border-b border-gray-200 bg-white">

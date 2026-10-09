@@ -453,7 +453,7 @@ function UpcomingWorkshops({ isCreator }: { isCreator: boolean }) {
         <div className="p-5">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-900">Upcoming workshops</h2>
-            <Link href={`${isCreator ? "/creator" : "/student"}/workshops`} className="text-sm font-medium text-indigo-600 hover:underline">
+            <Link href={isCreator ? "/creator/workshops" : "/workshops"} className="text-sm font-medium text-indigo-600 hover:underline">
               See all
             </Link>
           </div>

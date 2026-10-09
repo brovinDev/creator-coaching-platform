@@ -60,7 +60,7 @@ export default function LoginPage() {
         return;
       }
       const session = await (await fetch("/api/auth/session")).json();
-      router.push(session?.user?.role === "CREATOR" ? "/creator" : "/student");
+      router.push(session?.user?.role === "CREATOR" ? "/creator" : "/courses");
     } catch {
       toast.error("Something went wrong");
     } finally {

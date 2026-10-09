@@ -80,7 +80,7 @@ export default async function StudentDashboard() {
               totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
 
             return (
-              <Link key={String(course.id)} href={`/student/courses/${course.id}`}>
+              <Link key={String(course.id)} href={`/courses/${course.id}`}>
                 <Card className="cursor-pointer hover:shadow-md hover:border-indigo-200 transition-all h-full">
                   <div className="aspect-video bg-gray-100 rounded-t-xl flex items-center justify-center">
                     {course.thumbnail ? (

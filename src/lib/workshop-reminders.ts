@@ -109,7 +109,7 @@ async function sendWorkshopEmail(workshop: Row, startMs: number, due: DueEmail):
             date,
             time,
             startsIn: due.phrase,
-            link: joinUrl || `${process.env.NEXT_PUBLIC_APP_URL}/student/workshops`,
+            link: joinUrl || `${process.env.NEXT_PUBLIC_APP_URL}/workshops`,
           })
         );
         return sendEmail({ to: recipient.email, ...email, fromName, replyTo });

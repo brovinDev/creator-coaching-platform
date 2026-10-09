@@ -62,7 +62,7 @@ export default function StudentCoursePage({ params }: { params: Promise<{ course
 
   async function fetchCourse() {
     const res = await fetch(`/api/student/courses/${courseId}`);
-    if (!res.ok) { router.push("/student"); return; }
+    if (!res.ok) { router.push("/courses"); return; }
     const data = await res.json();
     setCourse(data);
     if (data.modules?.[0]?.lessons?.[0]) {

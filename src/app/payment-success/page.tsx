@@ -120,7 +120,7 @@ function PaymentSuccessContent() {
 
   const showButton = !(successConfig?.customButton && successConfig.hideButton);
   const buttonText = successConfig?.customButton ? (successConfig.customButtonText || "Login Now") : "Login Now";
-  const buttonUrl = successConfig?.customButton ? (successConfig.customButtonUrl || "/student") : "/student";
+  const buttonUrl = successConfig?.customButton ? (successConfig.customButtonUrl || "/courses") : "/courses";
 
   return (
     <ThemeScope color={themeColor} className="min-h-screen bg-gray-100 flex items-center justify-center px-4 py-8">
