@@ -32,6 +32,8 @@ interface Item {
 
 interface Group {
   label: string;
+  /** Stays open for every page under this path, such as the builder itself. */
+  base?: string;
   icon: Icon;
   items: { label: string; href: string }[];
 }
@@ -40,7 +42,6 @@ const ITEMS: Item[] = [
   { label: "Overview", href: "/creator", icon: LayoutDashboard, exact: true },
   { label: "Services", href: "/creator/services", icon: Briefcase },
   { label: "Workshops", href: "/creator/workshops", icon: Video },
-  { label: "Landing Pages", href: "/creator/landing-pages", icon: FileText },
   { label: "Community", href: "/creator/community", icon: MessageSquare },
   { label: "Coupons", href: "/creator/coupons", icon: Ticket },
   { label: "Customers", href: "/creator/customers", icon: Users },
@@ -48,6 +49,15 @@ const ITEMS: Item[] = [
 ];
 
 const GROUPS: Group[] = [
+  {
+    label: "Page Builder",
+    base: "/creator/page-builder",
+    icon: FileText,
+    items: [
+      { label: "Webinar / Workshop", href: "/creator/page-builder/webinar" },
+      { label: "1:1 Consultation", href: "/creator/page-builder/consultation" },
+    ],
+  },
   { label: "Automation", icon: Zap, items: [{ label: "Email Automation", href: "/creator/automation/email" }] },
   {
     label: "Settings",
@@ -72,6 +82,8 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const product = useProductName();
   const [openGroup, setOpenGroup] = useState<string | null>(null);
+  // A group closed by hand stays closed on that page; moving to another page reopens it.
+  const [closed, setClosed] = useState<{ label: string; path: string } | null>(null);
 
   return (
     <nav className="space-y-1">
@@ -86,14 +98,23 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
       })}
 
       {GROUPS.map((group) => {
-        // Stays open while you are inside it; otherwise it follows the last click.
-        const inside = group.items.some((i) => pathname.startsWith(i.href));
-        const open = inside || openGroup === group.label;
+        // Open while you are inside it (unless you closed it here); otherwise it follows the last click.
+        const inside = group.base ? pathname.startsWith(group.base) : group.items.some((i) => pathname.startsWith(i.href));
+        const closedHere = closed?.label === group.label && closed.path === pathname;
+        const open = inside ? !closedHere : openGroup === group.label;
         return (
           <div key={group.label}>
             <button
               type="button"
-              onClick={() => setOpenGroup(open && !inside ? null : group.label)}
+              onClick={() => {
+                if (open) {
+                  setOpenGroup(null);
+                  setClosed({ label: group.label, path: pathname });
+                } else {
+                  setOpenGroup(group.label);
+                  setClosed(null);
+                }
+              }}
               aria-expanded={open}
               className={cn(linkClass(false), "w-full cursor-pointer")}
             >

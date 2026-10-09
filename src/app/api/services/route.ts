@@ -3,6 +3,7 @@ import { auth, getNocodeToken } from "@/lib/auth";
 import { nocodeDb } from "@/lib/nocode/db";
 import { slugify } from "@/lib/utils";
 import { sanitizeRichText } from "@/lib/rich-text";
+import { isBillingInterval } from "@/lib/billing-intervals";
 
 export async function GET() {
   const session = await auth();
@@ -74,6 +75,7 @@ export async function POST(req: NextRequest) {
       description: sanitizeRichText(body.description),
       cover_image: body.cover_image || null,
       service_type,
+      billing_interval: service_type === "subscription" && isBillingInterval(body.billing_interval) ? body.billing_interval : null,
       status: "ACTIVE",
       currency: body.currency || "INR",
       price: body.price || 0,

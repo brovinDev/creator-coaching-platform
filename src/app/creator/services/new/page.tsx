@@ -14,6 +14,8 @@ import {
   Plus, X, ChevronDown, ChevronUp, Copy,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import { BillingIntervalField } from "@/components/creator/billing-interval-field";
+import type { BillingInterval } from "@/lib/billing-intervals";
 
 type Tab = "details" | "payment" | "success";
 type ServiceType = "one-time" | "subscription" | "free";
@@ -61,6 +63,7 @@ export default function CreateServicePage() {
   const [description, setDescription] = useState("");
   const [coverImage, setCoverImage] = useState("");
   const [serviceType, setServiceType] = useState<ServiceType>("one-time");
+  const [billingInterval, setBillingInterval] = useState<BillingInterval>("monthly");
   const [enableGst, setEnableGst] = useState(false);
   const [price, setPrice] = useState("");
   const [hasDiscount, setHasDiscount] = useState(false);
@@ -131,6 +134,7 @@ export default function CreateServicePage() {
           description,
           cover_image: coverImage,
           service_type: serviceType,
+          billing_interval: serviceType === "subscription" ? billingInterval : null,
           enable_gst: enableGst,
           price: serviceType === "free" ? 0 : Number(price),
           discounted_price: hasDiscount ? Number(discountedPrice) : null,
@@ -463,6 +467,8 @@ export default function CreateServicePage() {
                   ))}
                 </div>
               </div>
+
+              {serviceType === "subscription" && <BillingIntervalField value={billingInterval} onChange={setBillingInterval} />}
 
               <div className="flex items-center gap-3">
                 <Toggle value={enableGst} onChange={setEnableGst} />

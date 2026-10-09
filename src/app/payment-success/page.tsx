@@ -31,6 +31,7 @@ function PaymentSuccessContent() {
   const [themeColor, setThemeColor] = useState("");
   const [creatorInitials, setCreatorInitials] = useState(APP_NAME.slice(0, 2).toUpperCase());
   const [redirectCountdown, setRedirectCountdown] = useState<number | null>(null);
+  const [funnelSlug, setFunnelSlug] = useState("");
 
   const transactionId = searchParams.get("txn") || "";
   const amount = searchParams.get("amount") || "0";
@@ -54,6 +55,7 @@ function PaymentSuccessContent() {
     fetch(`/api/public/services/${serviceId}`)
       .then((r) => r.json())
       .then((s) => {
+        if (s.funnel_slug) setFunnelSlug(String(s.funnel_slug));
         if (s.creator?.logo) setCreatorLogo(s.creator.logo);
         if (s.branding?.themeColor) setThemeColor(s.branding.themeColor);
         if (s.creator?.name) {
@@ -66,6 +68,11 @@ function PaymentSuccessContent() {
       })
       .catch(() => {});
   }, [serviceId]);
+
+  // Registering through a webinar funnel ends on that funnel's own thank-you page.
+  useEffect(() => {
+    if (funnelSlug) router.replace(`/w/${funnelSlug}/thank-you`);
+  }, [funnelSlug, router]);
 
   useEffect(() => {
     if (!successConfig?.customScript || !successConfig.customScriptCode) return;
