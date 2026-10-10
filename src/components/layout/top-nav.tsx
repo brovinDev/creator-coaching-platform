@@ -8,13 +8,13 @@ import {
   CreditCard,
   Layers,
   LogOut,
-  MessageSquare,
   Compass,
   User,
   Video,
   BookOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { unreadUrl } from "@/lib/open-room";
 
 interface Tab {
   label: string;
@@ -41,7 +41,6 @@ const STUDENT_TABS: Tab[] = [
 
 const STUDENT_MENU_LINKS = [
   { label: "Payments", href: "/payments", icon: CreditCard },
-  { label: "Community", href: "/community", icon: MessageSquare },
   { label: "Profile", href: "/profile", icon: User },
 ];
 
@@ -101,6 +100,31 @@ export function TopNav({ role, user, logoUrl, brandName }: TopNavProps) {
   const tabs = isCreator ? CREATOR_TABS : STUDENT_TABS;
   const appName = brandName || process.env.NEXT_PUBLIC_APP_NAME || "Open Slate";
   const home = isCreator ? "/creator" : "/courses";
+  const [unread, setUnread] = useState(0);
+  const seq = useRef(0);
+
+  // Unread room messages show as a badge on the Feed tab, where Messages lives.
+  useEffect(() => {
+    const check = () => {
+      if (document.hidden) return;
+      const mine = ++seq.current;
+      fetch(unreadUrl())
+        .then((r) => (r.ok ? r.json() : null))
+        // A slower, older answer must not overwrite a newer one.
+        .then((d) => d && mine === seq.current && setUnread(Number(d.unread) || 0))
+        .catch(() => {});
+    };
+    check();
+    const id = setInterval(check, 15000);
+    const onCount = (e: Event) => setUnread(Number((e as CustomEvent).detail) || 0);
+    window.addEventListener("messages-changed", check);
+    window.addEventListener("unread-count", onCount);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener("messages-changed", check);
+      window.removeEventListener("unread-count", onCount);
+    };
+  }, [pathname]);
 
   return (
     <header className="sticky top-0 z-30 border-b border-gray-200 bg-white">
@@ -124,7 +148,14 @@ export function TopNav({ role, user, logoUrl, brandName }: TopNavProps) {
               : pathname.startsWith(tab.href);
             const inner = (
               <>
-                <tab.icon className="h-5 w-5" />
+                <span className="relative">
+                  <tab.icon className="h-5 w-5" />
+                  {tab.label === "Feed" && unread > 0 && (
+                    <span className="absolute -right-2.5 -top-2 min-w-[16px] rounded-full bg-red-500 px-1 text-center text-[10px] font-bold leading-4 text-white">
+                      {unread > 99 ? "99+" : unread}
+                    </span>
+                  )}
+                </span>
                 <span className="text-[11px] font-semibold uppercase tracking-wider">{tab.label}</span>
                 {tab.soon && <span className="sr-only">(coming soon)</span>}
               </>
