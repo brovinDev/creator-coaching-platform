@@ -8,11 +8,16 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { RichTextEditor } from "@/components/rich-text-editor";
+import { RichTextContent } from "@/components/rich-text-content";
+import { toEditorHtml } from "@/lib/rich-text-client";
 import {
   ArrowLeft, Upload, ImageIcon, Loader2, Trash2, Check,
   Plus, X, ChevronDown, ChevronUp, Copy,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import { BillingIntervalField } from "@/components/creator/billing-interval-field";
+import { isBillingInterval, type BillingInterval } from "@/lib/billing-intervals";
 
 // Beefree touches window on load, so it must never render on the server.
 
@@ -70,6 +75,7 @@ export default function EditServicePage() {
   const [description, setDescription] = useState("");
   const [coverImage, setCoverImage] = useState("");
   const [serviceType, setServiceType] = useState<ServiceType>("one-time");
+  const [billingInterval, setBillingInterval] = useState<BillingInterval>("monthly");
   const [enableGst, setEnableGst] = useState(false);
   const [price, setPrice] = useState("");
   const [hasDiscount, setHasDiscount] = useState(false);
@@ -109,9 +115,10 @@ export default function EditServicePage() {
         if (!serviceRes.ok) throw new Error("Not found");
         const data = await serviceRes.json();
         setTitle(data.title || "");
-        setDescription(data.description || "");
+        setDescription(toEditorHtml(data.description));
         setCoverImage(data.cover_image || "");
         setServiceType(data.service_type || "one-time");
+        if (isBillingInterval(data.billing_interval)) setBillingInterval(data.billing_interval);
         setEnableGst(!!data.enable_gst);
         setPrice(data.price ? String(data.price) : "");
         setHasDiscount(!!data.discounted_price);
@@ -196,6 +203,7 @@ export default function EditServicePage() {
           description,
           cover_image: coverImage || null,
           service_type: serviceType,
+          billing_interval: serviceType === "subscription" ? billingInterval : null,
           enable_gst: enableGst,
           price: serviceType === "free" ? 0 : Number(price),
           discounted_price: hasDiscount ? Number(discountedPrice) : null,
@@ -460,7 +468,7 @@ export default function EditServicePage() {
             </div>
           )}
           {description && (
-            <p className="mt-3 text-xs text-gray-600 whitespace-pre-line">{description}</p>
+            <RichTextContent html={description} className="mt-3 text-xs text-gray-600 whitespace-pre-line" />
           )}
           <p className="mt-4 text-[10px] text-gray-400 leading-tight">
             You agree to share information entered on this page with {APP_NAME} (owner of this page) and Razorpay, adhering to applicable laws.
@@ -527,13 +535,6 @@ export default function EditServicePage() {
           {/* ========== SERVICE DETAILS TAB ========== */}
           {activeTab === "details" && (
             <div className="space-y-6">
-              <div className="flex items-center gap-3">
-                <Toggle value={published} onChange={setPublished} />
-                <span className="text-sm font-medium text-gray-700">
-                  {published ? "Published (visible to learners)" : "Draft (not visible)"}
-                </span>
-              </div>
-
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="block text-sm font-medium text-gray-700">Service title</label>
@@ -570,7 +571,7 @@ export default function EditServicePage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Service description</label>
-                <Textarea placeholder="Add Service description here..." value={description} onChange={(e) => setDescription(e.target.value)} className="min-h-[160px]" />
+                <RichTextEditor placeholder="Add Service description here..." value={description} onChange={setDescription} />
               </div>
 
               <div>
@@ -583,6 +584,8 @@ export default function EditServicePage() {
                   ))}
                 </div>
               </div>
+
+              {serviceType === "subscription" && <BillingIntervalField value={billingInterval} onChange={setBillingInterval} />}
 
               <div className="flex items-center gap-3">
                 <Toggle value={enableGst} onChange={setEnableGst} />

@@ -2,6 +2,7 @@ import { createHash, timingSafeEqual } from "crypto";
 import { after, NextRequest, NextResponse } from "next/server";
 import { runWorkshopReminders } from "@/lib/workshop-reminders";
 import { reconcilePendingOrders } from "@/lib/reconcile-orders";
+import { reconcileSubscriptions } from "@/lib/subscription";
 
 const digest = (value: string) => createHash("sha256").update(value).digest();
 
@@ -35,6 +36,15 @@ export async function POST(req: NextRequest) {
       }
     } catch (error) {
       console.error("[reconcile-orders] run failed", error);
+    }
+    // Every 5 minutes: renewals, failed charges, cancellations and the end of paid periods.
+    try {
+      if (new Date().getMinutes() % 5 === 0) {
+        const synced = await reconcileSubscriptions();
+        if (synced.changed > 0) console.log("[reconcile-subscriptions]", JSON.stringify(synced));
+      }
+    } catch (error) {
+      console.error("[reconcile-subscriptions] run failed", error);
     }
   });
   return NextResponse.json({ queued: true }, { status: 202 });

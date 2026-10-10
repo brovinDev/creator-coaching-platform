@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth, getNocodeToken } from "@/lib/auth";
 import { nocodeDb } from "@/lib/nocode/db";
+import { sanitizeRichText } from "@/lib/rich-text";
 
 export async function GET(
   _req: NextRequest,
@@ -51,7 +52,7 @@ export async function PUT(
 
   const body = await req.json();
   const allowedFields = [
-    "title", "description", "cover_image", "service_type", "status",
+    "title", "description", "cover_image", "service_type", "billing_interval", "status",
     "currency", "price", "discounted_price", "start_date", "enable_gst",
     "payment_success_message", "published", "course_id",
     "payment_config", "success_config",
@@ -61,6 +62,7 @@ export async function PUT(
   for (const field of allowedFields) {
     if (field in body) updates[field] = body[field];
   }
+  if ("description" in updates) updates.description = sanitizeRichText(updates.description as string);
 
   try {
     const updated = await nocodeDb.services.update(serviceId, updates, token);

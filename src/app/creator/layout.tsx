@@ -14,7 +14,7 @@ export default async function CreatorLayout({ children }: { children: React.Reac
   }
 
   if (session.user.role !== "CREATOR") {
-    redirect("/student");
+    redirect("/courses");
   }
 
   const branding = await getBranding(session.user.id);

@@ -7,12 +7,14 @@ import Script from "next/script";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  ArrowLeft, Plus, Mail, CheckCircle, LogIn, X,
+  ArrowLeft, Plus, Mail, CheckCircle, X,
 } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
+import { RichTextContent } from "@/components/rich-text-content";
 import { buttonStyle } from "@/lib/branding-colors";
 import { ThemeScope } from "@/components/theme-scope";
 import toast from "react-hot-toast";
+import { intervalSuffix } from "@/lib/billing-intervals";
 
 const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME || "Open Slate";
 
@@ -38,6 +40,8 @@ interface ServiceData {
   discountedPrice: number | null;
   enableGst: boolean;
   serviceType: string;
+  /** monthly, quarterly, half-yearly or yearly, for a subscription. */
+  billingInterval: string;
   slug: string;
   creator: { name: string; logo: string | null };
   branding?: { themeColor: string; termsUrl: string; privacyUrl: string };
@@ -66,8 +70,9 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
   const [submitting, setSubmitting] = useState(false);
 
   const [authStep, setAuthStep] = useState<AuthStep>("form");
-  const [isExistingUser, setIsExistingUser] = useState(false);
-  const [form, setForm] = useState({ name: "", email: "", password: "" });
+  // The name is only asked for when this email has no account yet.
+  const [needsName, setNeedsName] = useState(false);
+  const [form, setForm] = useState({ name: "", email: "" });
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [resendTimer, setResendTimer] = useState(0);
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -111,7 +116,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
         coverImage: s.cover_image || null,
         price: Number(s.price) || 0,
         discountedPrice: s.discounted_price ? Number(s.discounted_price) : null,
-        enableGst: !!s.enable_gst, serviceType: s.service_type || "one-time",
+        enableGst: !!s.enable_gst, serviceType: s.service_type || "one-time", billingInterval: s.billing_interval || "",
         slug: s.slug || "",
         creator: s.creator || { name: "Creator", logo: null },
         branding: s.branding,
@@ -128,7 +133,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
         title: c.title || "", description: c.description || "",
         coverImage: c.thumbnail || null,
         price: Number(c.price) || 0, discountedPrice: null,
-        enableGst: false, serviceType: "one-time", slug: c.slug || "",
+        enableGst: false, serviceType: "one-time", billingInterval: "", slug: c.slug || "",
         creator: c.creator || { name: "Creator", logo: null },
         customFields: [],
       });
@@ -148,17 +153,12 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
   const gstAmount = service?.enableGst ? Math.round(priceAfterCoupon * 0.18) : 0;
   const totalAmount = priceAfterCoupon + gstAmount;
   const isFree = service?.serviceType === "free" || totalAmount === 0;
+  const isSubscription = service?.serviceType === "subscription" && !isFree;
+  const every = intervalSuffix(service?.billingInterval);
 
   async function handleSendOtp(e?: React.FormEvent) {
     if (e) e.preventDefault();
     if (!form.email) return;
-    if (!isExistingUser) {
-      const pw = form.password;
-      if (pw.length < 8 || !/[a-z]/.test(pw) || !/[A-Z]/.test(pw) || !/[0-9]/.test(pw) || !/[^a-zA-Z0-9]/.test(pw)) {
-        toast.error("Password needs 8+ chars with uppercase, lowercase, number & special character");
-        return;
-      }
-    }
     setSubmitting(true);
     try {
       const res = await fetch("/api/checkout/send-otp", {
@@ -166,25 +166,14 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
         body: JSON.stringify({ name: form.name, email: form.email }),
       });
       const data = await res.json();
-      if (!res.ok) toast.error(data.error || "Failed to send OTP");
+      if (data.needsName) { setNeedsName(true); toast(data.error || "Please enter your name"); }
+      else if (!res.ok) toast.error(data.error || "Failed to send OTP");
       else {
         toast.success("Verification code sent!");
         setAuthStep("otp");
         setResendTimer(60);
         setTimeout(() => otpRefs.current[0]?.focus(), 100);
       }
-    } catch { toast.error("Something went wrong"); }
-    finally { setSubmitting(false); }
-  }
-
-  async function handleLogin(e: React.FormEvent) {
-    e.preventDefault();
-    if (!form.email || !form.password) return;
-    setSubmitting(true);
-    try {
-      const result = await signIn("credentials", { email: form.email, password: form.password, redirect: false });
-      if (result?.error) toast.error("Invalid email or password");
-      else { toast.success("Signed in!"); setAuthStep("done"); }
     } catch { toast.error("Something went wrong"); }
     finally { setSubmitting(false); }
   }
@@ -196,14 +185,14 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
     try {
       const res = await fetch("/api/checkout/verify-and-register", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: form.email, otp: otpString, name: form.name, password: form.password }),
+        body: JSON.stringify({ email: form.email, otp: otpString, name: form.name }),
       });
       const data = await res.json();
       if (!res.ok) toast.error(data.error || "Verification failed");
       else {
-        const result = await signIn("credentials", { email: form.email, password: form.password, redirect: false });
-        if (result?.error) toast.error("Account created but login failed.");
-        else { toast.success("Account created!"); setAuthStep("done"); }
+        const result = await signIn("credentials", { email: form.email, otp: otpString, redirect: false });
+        if (result?.error) toast.error("Your code could not be used to sign in. Please ask for a new one.");
+        else { toast.success("You are signed in!"); setAuthStep("done"); }
       }
     } catch { toast.error("Something went wrong"); }
     finally { setSubmitting(false); }
@@ -235,7 +224,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
       const res = await fetch("/api/coupons/validate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: couponCode, serviceId: service?.kind === "service" ? service.id : undefined }),
+        body: JSON.stringify({ code: couponCode.trim(), serviceId: service?.kind === "service" ? service.id : undefined }),
       });
       const data = await res.json();
       if (res.ok && data.valid) {
@@ -275,6 +264,35 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
           router.push(`/payment-success?${p.toString()}`);
         } else { const data = await res.json(); toast.error(data.error || "Enrollment failed"); }
         setSubmitting(false);
+        return;
+      }
+      if (isSubscription) {
+        const subRes = await fetch("/api/checkout/create-subscription", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ serviceId: service.id }),
+        });
+        const subData = await subRes.json();
+        if (!subRes.ok) { toast.error(subData.error || "Could not start the subscription"); setSubmitting(false); return; }
+
+        const subOptions = {
+          key: subData.key, subscription_id: subData.subscriptionId,
+          name: APP_NAME, description: `${service.title} ${every}`,
+          prefill: { name: form.name, email: form.email },
+          handler: async (response: { razorpay_payment_id: string; razorpay_subscription_id: string }) => {
+            const verifyRes = await fetch("/api/checkout/verify-subscription", {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ subscriptionId: response.razorpay_subscription_id || subData.subscriptionId }),
+            });
+            if (verifyRes.ok) {
+              const vd = await verifyRes.json();
+              const p = new URLSearchParams({ txn: vd.transactionId || response.razorpay_payment_id, amount: String(vd.amount || ""), service: vd.serviceName || "", method: "Razorpay", sid: service.id });
+              router.push(`/payment-success?${p.toString()}`);
+            } else router.push("/payment-failed");
+          },
+          modal: { ondismiss: () => setSubmitting(false) },
+          theme: { color: "#4F46E5" },
+        };
+        new window.Razorpay(subOptions).open();
         return;
       }
       const orderRes = await fetch("/api/checkout/create-order", {
@@ -340,8 +358,9 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
                 </p>
                 <p className="text-2xl font-bold text-gray-900 mt-3">
                   {isFree ? "Free" : formatPrice(basePrice)}
+                  {isSubscription && every && <span className="text-base font-medium text-gray-500 ml-1">{every}</span>}
                   {service.discountedPrice !== null && (
-                    <span className="text-base text-gray-400 line-through ml-2">
+                    <span className="text-lg font-medium text-gray-500 line-through decoration-red-500/70 ml-2">
                       {formatPrice(service.price)}
                     </span>
                   )}
@@ -354,9 +373,10 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
                 )}
 
                 {service.description && (
-                  <div className="mt-6 text-gray-700 text-sm leading-relaxed whitespace-pre-line">
-                    {service.description}
-                  </div>
+                  <RichTextContent
+                    html={service.description}
+                    className="mt-6 text-gray-700 text-sm leading-relaxed whitespace-pre-line"
+                  />
                 )}
               </div>
             </div>
@@ -372,38 +392,19 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
                 {/* Auth */}
                 {authStep !== "done" && (
                   <div className="mt-5 border border-gray-200 rounded-xl p-4">
-                    {authStep === "form" && !isExistingUser && (
+                    {authStep === "form" && (
                       <>
-                        <p className="text-sm font-medium text-gray-900 mb-3">Verify using email</p>
+                        <p className="text-sm font-medium text-gray-900 mb-1">Verify using email</p>
+                        <p className="text-xs text-gray-500 mb-3">We will email you a code. No password needed.</p>
                         <form onSubmit={handleSendOtp} className="space-y-3">
-                          <Input placeholder="Full Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
                           <Input type="email" placeholder="Enter your email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
-                          <Input type="password" placeholder="Create password (min 6 chars)" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required minLength={6} />
+                          {needsName && (
+                            <Input placeholder="Full Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required autoFocus />
+                          )}
                           <button type="submit" disabled={submitting} className="w-full py-3 bg-red-700 hover:bg-red-800 text-white rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 cursor-pointer">
                             {submitting ? "Sending..." : "Request OTP"}
                           </button>
                         </form>
-                        <p className="text-center text-xs text-gray-500 mt-3">
-                          OR, <button onClick={() => setIsExistingUser(true)} className="text-indigo-600 font-medium cursor-pointer">Sign in with password</button>
-                        </p>
-                      </>
-                    )}
-
-                    {authStep === "form" && isExistingUser && (
-                      <>
-                        <p className="text-sm font-medium text-gray-900 mb-3 flex items-center gap-2">
-                          <LogIn className="h-4 w-4" /> Sign in
-                        </p>
-                        <form onSubmit={handleLogin} className="space-y-3">
-                          <Input type="email" placeholder="Enter your email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
-                          <Input type="password" placeholder="Password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
-                          <button type="submit" disabled={submitting} className="w-full py-3 bg-red-700 hover:bg-red-800 text-white rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 cursor-pointer">
-                            {submitting ? "Signing in..." : "Sign In"}
-                          </button>
-                        </form>
-                        <p className="text-center text-xs text-gray-500 mt-3">
-                          OR, <button onClick={() => setIsExistingUser(false)} className="text-indigo-600 font-medium cursor-pointer">Verify using email</button>
-                        </p>
                       </>
                     )}
 
@@ -511,7 +512,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
                         <X className="h-4 w-4" />
                       </button>
                     </div>
-                  ) : !showCoupon ? (
+                  ) : isSubscription ? null : !showCoupon ? (
                     <button
                       onClick={() => setShowCoupon(true)}
                       className="w-full flex items-center justify-between px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-600 hover:border-gray-300 transition-colors cursor-pointer"
@@ -545,6 +546,11 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
                   <div className="flex items-start justify-between gap-4">
                     <span className="text-sm text-gray-900">{service.title}</span>
                     <span className="text-sm font-medium text-gray-900 shrink-0">
+                      {service.discountedPrice !== null && (
+                        <span className="text-sm text-gray-500 line-through decoration-red-500/70 mr-2">
+                          {formatPrice(service.price)}
+                        </span>
+                      )}
                       {isFree && !appliedCoupon ? "Free" : formatPrice(basePrice)}
                     </span>
                   </div>
@@ -565,10 +571,17 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
 
                   <div className="border-t border-gray-200 pt-3 flex items-center justify-between">
                     <span className="text-sm font-semibold text-gray-900">Amount to be paid :</span>
-                    <span className="text-base font-bold text-gray-900">
+                    <span className="text-lg font-bold text-gray-900">
+                      {service.discountedPrice !== null && !isFree && totalAmount < service.price && (
+                        <span className="text-sm font-medium text-gray-500 line-through decoration-red-500/70 mr-2">
+                          {formatPrice(service.price)}
+                        </span>
+                      )}
                       {isFree ? "Free" : formatPrice(totalAmount)}
+                      {isSubscription && every && <span className="font-medium text-gray-500"> {every}</span>}
                     </span>
                   </div>
+                  {isSubscription && <p className="text-xs text-gray-500">Renews automatically {every.replace("/ ", "every ")} until you cancel. You can cancel any time.</p>}
                 </div>
 
                 {/* Pay button */}
@@ -578,7 +591,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
                   className="w-full mt-5 py-3.5 bg-gray-400 hover:bg-gray-500 disabled:bg-gray-300 text-white rounded-lg text-sm font-semibold transition-colors cursor-pointer disabled:cursor-not-allowed"
                   style={authStep === "done" ? buttonStyle(service.branding?.themeColor) : {}}
                 >
-                  {submitting ? "Processing..." : isFree ? "Register" : `Proceed to pay ${formatPrice(totalAmount)}`}
+                  {submitting ? "Processing..." : isFree ? "Register" : isSubscription ? `Subscribe for ${formatPrice(totalAmount)} ${every}` : `Proceed to pay ${formatPrice(totalAmount)}`}
                 </button>
 
                 {(service.branding?.termsUrl || service.branding?.privacyUrl) && (

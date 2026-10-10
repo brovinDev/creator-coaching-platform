@@ -54,7 +54,7 @@ export function buildPlaceholderValues(input: {
     "order.amount": input.amount,
     "order.transaction_id": input.transactionId,
     "creator.name": input.creatorName,
-    "link.dashboard": `${process.env.NEXT_PUBLIC_APP_URL}/student`,
+    "link.dashboard": `${process.env.NEXT_PUBLIC_APP_URL}/courses`,
   };
 }
 
@@ -85,7 +85,7 @@ export function buildReminderPlaceholderValues(input: {
     "workshop.time": input.time,
     "workshop.starts_in": input.startsIn,
     "workshop.link": input.link,
-    "link.dashboard": `${process.env.NEXT_PUBLIC_APP_URL}/student`,
+    "link.dashboard": `${process.env.NEXT_PUBLIC_APP_URL}/courses`,
   };
 }
 

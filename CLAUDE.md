@@ -41,17 +41,17 @@ Located at `../nocode-backend/` (sibling folder). Branch: `app/open-slate/main`.
 - Email API supports 6 providers
 
 ## Key Files
-- `src/lib/auth.ts` — NextAuth config + `getNocodeToken()` helper to extract nocode JWT from session
+- `src/lib/auth.ts` — NextAuth config (sign-in by emailed code) + `getNocodeToken()` (returns the system token)
 - `src/lib/email.ts` — Email via nocode backend's email API using `NOCODE_SYSTEM_TOKEN`
 - `src/lib/upload.ts` — Direct Cloudinary upload (no nocode dependency)
 - `src/lib/utils.ts` — Shared utilities including `formatPrice`, `slugify`
 
 ## Auth Flow
-- NextAuth Credentials provider calls `nocodeSignin()` for login
-- Nocode JWT stored in NextAuth token
-- User profile (role, bio, avatar) stored in `user_profiles` nocode module
-- Roles: CREATOR, STUDENT
-- OTP-based verification for checkout flow (separate from login)
+- Sign-in is by a one-time code emailed to the person (6 digits, 10 minutes, single use, 5 wrong tries, 30 s between codes). There are no passwords: `src/lib/otp-auth.ts` holds the code logic, `src/lib/account.ts` creates accounts.
+- NextAuth Credentials provider takes `{ email, otp }`, uses the code up, and finds the account through the backend's `GET /api/open-slate/users/by-email`. The session has no nocode JWT; server calls use `NOCODE_SYSTEM_TOKEN`.
+- The backend still needs a password per account, so new accounts get a random one nobody sees.
+- User profile (role, bio, avatar) stored in the `user_profiles` nocode module
+- Roles: CREATOR (public sign-up), STUDENT (created at a service's checkout)
 
 ## Environment Variables
 ```

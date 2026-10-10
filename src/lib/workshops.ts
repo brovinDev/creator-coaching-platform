@@ -106,7 +106,7 @@ export function parseWorkshopBody(
     if (recurrenceEnd > limit.toISOString().slice(0, 10)) return "Recurring workshops can run for up to a year";
   }
 
-  const pick = (v: unknown) => (Array.isArray(v) ? v.map(String).filter((id) => ownServiceIds.has(id)) : []);
+  const pick = (v: unknown) => (Array.isArray(v) ? [...new Set(v.map(String))].filter((id) => ownServiceIds.has(id)) : []);
   const serviceIds = pick(body.serviceIds);
   if (serviceIds.length === 0) return "Link at least one service";
   const excludeIds = pick(body.excludeServiceIds).filter((id) => !serviceIds.includes(id));

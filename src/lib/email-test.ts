@@ -70,7 +70,7 @@ function sampleValues(kind: EmailKind, user: { name: string; email: string }): R
     date: "Thu, 8 Oct",
     time: "7:00 pm IST",
     startsIn: REMINDERS.find((r) => r.key === kind)?.phrase ?? "",
-    link: `${app}/student/workshops`,
+    link: `${app}/workshops`,
   });
 }
 

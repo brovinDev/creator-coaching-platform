@@ -25,7 +25,8 @@ export async function POST(req: NextRequest) {
 
   const token = await getNocodeToken();
   const body = await req.json();
-  const { code, service_id, discount_type, discount_value, max_usages, start_date, end_date, target_customer } = body;
+  const { service_id, discount_type, discount_value, max_usages, start_date, end_date, target_customer } = body;
+  const code = typeof body.code === "string" ? body.code.trim() : body.code;
 
   if (!code || !discount_type || discount_value === undefined || !start_date || !end_date) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth, getNocodeToken } from "@/lib/auth";
 import { nocodeDb } from "@/lib/nocode/db";
 import { slugify } from "@/lib/utils";
+import { sanitizeRichText } from "@/lib/rich-text";
+import { isBillingInterval } from "@/lib/billing-intervals";
 
 export async function GET() {
   const session = await auth();
@@ -70,9 +72,10 @@ export async function POST(req: NextRequest) {
     {
       title,
       slug,
-      description: body.description || "",
+      description: sanitizeRichText(body.description),
       cover_image: body.cover_image || null,
       service_type,
+      billing_interval: service_type === "subscription" && isBillingInterval(body.billing_interval) ? body.billing_interval : null,
       status: "ACTIVE",
       currency: body.currency || "INR",
       price: body.price || 0,
@@ -84,7 +87,7 @@ export async function POST(req: NextRequest) {
       payment_success_message: body.payment_success_message || "",
       payment_config: body.payment_config || null,
       success_config: body.success_config || null,
-      published: false,
+      published: true,
     },
     token
   );
