@@ -37,6 +37,8 @@ export const MODULES = {
   service_subscriptions: "service_subscriptions",
   workshop_reminders: "workshop_reminders",
   creator_reminder_templates: "creator_reminder_templates",
+  plan_payments: "plan_payments",
+  plans: "platform_plans",
 } as const;
 
 type Row = Record<string, unknown>;
@@ -163,4 +165,6 @@ export const nocodeDb = {
   serviceSubscriptions: new NocodeModel(MODULES.service_subscriptions),
   workshopReminders: new NocodeModel(MODULES.workshop_reminders),
   creatorReminderTemplates: new NocodeModel(MODULES.creator_reminder_templates),
+  planPayments: new NocodeModel(MODULES.plan_payments),
+  plans: new NocodeModel(MODULES.plans),
 };

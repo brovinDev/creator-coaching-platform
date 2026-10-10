@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   Menu,
   MessageSquare,
+  Receipt,
   Settings,
   Ticket,
   Users,
@@ -56,6 +57,15 @@ const GROUPS: Group[] = [
     items: [
       { label: "Webinar / Workshop", href: "/creator/page-builder/webinar" },
       { label: "1:1 Consultation", href: "/creator/page-builder/consultation" },
+    ],
+  },
+  {
+    label: "Billing & Plans",
+    icon: Receipt,
+    items: [
+      { label: "Billings", href: "/creator/billing" },
+      { label: "Plans", href: "/creator/plans" },
+      { label: "Tax Reports", href: "/creator/tax-reports" },
     ],
   },
   { label: "Automation", icon: Zap, items: [{ label: "Email Automation", href: "/creator/automation/email" }] },

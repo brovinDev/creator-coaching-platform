@@ -116,7 +116,12 @@ export function TopNav({ role, user, logoUrl, brandName }: TopNavProps) {
 
         <nav className="flex min-w-0 flex-1 items-stretch justify-start gap-1 overflow-x-auto sm:justify-center sm:gap-6">
           {tabs.map((tab) => {
-            const active = tab.exact ? pathname === tab.href : pathname.startsWith(tab.href);
+            // For a creator, Dashboard also covers every sidebar page (Billing, Services...) that is not another tab.
+            const active = tab.exact
+              ? isCreator
+                ? pathname.startsWith(tab.href) && !tabs.some((t) => t !== tab && pathname.startsWith(t.href))
+                : pathname === tab.href
+              : pathname.startsWith(tab.href);
             const inner = (
               <>
                 <tab.icon className="h-5 w-5" />
