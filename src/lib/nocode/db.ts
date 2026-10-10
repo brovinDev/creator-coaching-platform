@@ -39,6 +39,9 @@ export const MODULES = {
   creator_reminder_templates: "creator_reminder_templates",
   plan_payments: "plan_payments",
   plans: "platform_plans",
+  message_rooms: "message_rooms",
+  room_messages: "room_messages",
+  room_reads: "room_reads",
 } as const;
 
 type Row = Record<string, unknown>;
@@ -167,4 +170,7 @@ export const nocodeDb = {
   creatorReminderTemplates: new NocodeModel(MODULES.creator_reminder_templates),
   planPayments: new NocodeModel(MODULES.plan_payments),
   plans: new NocodeModel(MODULES.plans),
+  messageRooms: new NocodeModel(MODULES.message_rooms),
+  roomMessages: new NocodeModel(MODULES.room_messages),
+  roomReads: new NocodeModel(MODULES.room_reads),
 };

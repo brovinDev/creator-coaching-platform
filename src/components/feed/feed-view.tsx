@@ -3,10 +3,12 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { Clock, Heart, Loader2, MessageCircle, PenSquare, Plus, Trash2, Video } from "lucide-react";
+import { Clock, Compass, Heart, Loader2, MessageCircle, MessageSquare, PenSquare, Plus, Trash2, Video } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { CreatePostModal } from "./create-post-modal";
+import { MessagesView } from "./messages-view";
+import { unreadUrl } from "@/lib/open-room";
 import { type SessionItem } from "@/components/workshops/workshop-list";
 
 interface Post {
@@ -513,6 +515,33 @@ export function FeedView({
   const [posts, setPosts] = useState<Post[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [view, setView] = useState<"feed" | "messages">("feed");
+  const [unread, setUnread] = useState(0);
+  const seq = useRef(0);
+
+  useEffect(() => {
+    const check = () => {
+      if (document.hidden) return;
+      const mine = ++seq.current;
+      fetch(unreadUrl())
+        .then((r) => (r.ok ? r.json() : null))
+        // A slower, older answer must not overwrite a newer one.
+        .then((d) => {
+          if (!d || mine !== seq.current) return;
+          const n = Number(d.unread) || 0;
+          setUnread(n);
+          window.dispatchEvent(new CustomEvent("unread-count", { detail: n }));
+        })
+        .catch(() => {});
+    };
+    check();
+    const id = setInterval(check, 20000);
+    window.addEventListener("messages-changed", check);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener("messages-changed", check);
+    };
+  }, [view]);
 
   const load = useCallback(() => {
     fetch("/api/feed")
@@ -540,6 +569,31 @@ export function FeedView({
     }
   }
 
+  const VIEWS = [
+    { key: "feed", label: "Feed", icon: Compass },
+    { key: "messages", label: "Messages", icon: MessageSquare },
+  ] as const;
+  const viewButton = (v: (typeof VIEWS)[number], pill = false) => (
+    <button
+      key={v.key}
+      type="button"
+      onClick={() => setView(v.key)}
+      aria-current={view === v.key ? "page" : undefined}
+      className={cn(
+        "flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium",
+        pill ? "flex-1 justify-center border border-gray-200" : "w-full",
+        view === v.key ? "bg-gray-200 text-gray-900" : "text-gray-600 hover:bg-gray-100"
+      )}
+    >
+      <v.icon className="h-5 w-5" /> {v.label}
+      {v.key === "messages" && unread > 0 && (
+        <span className="ml-auto min-w-[20px] rounded-full bg-red-500 px-1.5 text-center text-xs font-bold leading-5 text-white">
+          {unread > 99 ? "99+" : unread}
+        </span>
+      )}
+    </button>
+  );
+
   return (
     <div className="grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[260px_minmax(0,640px)_1fr]">
       <aside className="hidden lg:block">
@@ -548,10 +602,17 @@ export function FeedView({
           <p className="text-sm font-semibold uppercase tracking-wide text-gray-900">{userName}</p>
         </div>
         {isCreator && <CreateMenu onPost={() => setCreating(true)} />}
+        <nav className="mt-5 space-y-1">{VIEWS.map((v) => viewButton(v))}</nav>
       </aside>
 
-      <div className="min-w-0 space-y-4">
-        {isCreator && (
+      <div className={cn("min-w-0 space-y-4", view === "messages" && "xl:col-span-2")}>
+        <div className="flex gap-2 lg:hidden">
+          {VIEWS.map((v) => viewButton(v, true))}
+        </div>
+
+        {view === "messages" && <MessagesView isCreator={isCreator} />}
+
+        {view === "feed" && isCreator && (
           <Card>
             <button
               type="button"
@@ -565,16 +626,16 @@ export function FeedView({
           </Card>
         )}
 
-        <UpcomingWorkshops isCreator={isCreator} />
+        {view === "feed" && <UpcomingWorkshops isCreator={isCreator} />}
 
-        <h2 className="pt-2 text-xl font-bold text-gray-900">Feed</h2>
+        {view === "feed" && <h2 className="pt-2 text-xl font-bold text-gray-900">Feed</h2>}
 
-        {posts === null && !failed && (
+        {view === "feed" && posts === null && !failed && (
           <div className="flex justify-center py-12">
             <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
           </div>
         )}
-        {failed && (
+        {view === "feed" && failed && (
           <Card>
             <div className="p-8 text-center text-sm text-gray-500">
               Could not load the feed.{" "}
@@ -584,7 +645,7 @@ export function FeedView({
             </div>
           </Card>
         )}
-        {posts && posts.length === 0 && (
+        {view === "feed" && posts && posts.length === 0 && (
           <Card>
             <div className="p-10 text-center">
               <p className="font-medium text-gray-900">No posts yet</p>
@@ -596,7 +657,7 @@ export function FeedView({
             </div>
           </Card>
         )}
-        {posts?.map((post) => (
+        {view === "feed" && posts?.map((post) => (
           <PostCard
             key={post.id}
             post={post}
