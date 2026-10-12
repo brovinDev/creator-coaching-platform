@@ -49,6 +49,7 @@ export default function SignupPage() {
   }
 
   async function verify() {
+    if (loading) return; // Enter and the button must not send the same code twice: it works once.
     const code = digits.join("");
     if (code.length !== 6) return void toast.error("Enter the 6-digit code");
     setLoading(true);

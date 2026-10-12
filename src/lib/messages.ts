@@ -15,7 +15,25 @@ export async function getAccessibleRoom(roomId: string, user: User, token: strin
   return enrolled.length > 0 ? room : null;
 }
 
-export function messageOut(m: Row, userId: string) {
+export type ReactionOut = { emoji: string; count: number; mine: boolean };
+
+/** Groups reaction rows by message: how many people used each emoji, and whether this user did. */
+export function groupReactions(rows: Row[], userId: string) {
+  const byMessage = new Map<string, Map<string, ReactionOut>>();
+  for (const r of rows) {
+    const messageId = String(r.message_id);
+    const emoji = String(r.emoji);
+    const perMessage = byMessage.get(messageId) ?? new Map<string, ReactionOut>();
+    const entry = perMessage.get(emoji) ?? { emoji, count: 0, mine: false };
+    entry.count += 1;
+    if (String(r.user_id) === userId) entry.mine = true;
+    perMessage.set(emoji, entry);
+    byMessage.set(messageId, perMessage);
+  }
+  return byMessage;
+}
+
+export function messageOut(m: Row, userId: string, reactions: ReactionOut[] = []) {
   return {
     id: String(m.id),
     userName: String(m.user_name || "Member"),
@@ -23,6 +41,8 @@ export function messageOut(m: Row, userId: string) {
     content: String(m.content || ""),
     createdAt: String(m.created_at || ""),
     mine: String(m.user_id) === userId,
+    parentId: m.parent_id ? String(m.parent_id) : null,
+    reactions,
   };
 }
 
@@ -50,6 +70,7 @@ export async function listRooms(user: User, token: string) {
 
   const reads = await nocodeDb.roomReads.findMany({ where: { user_id: user.id } }, token);
   const readUpTo = new Map(reads.map((r) => [String(r.room_id), time(r.last_read_at)]));
+  const mutedRooms = new Set(reads.filter((r) => r.muted === "true" || r.muted === true).map((r) => String(r.room_id)));
 
   const out = await Promise.all(
     rooms.map(async (r) => {
@@ -66,6 +87,7 @@ export async function listRooms(user: User, token: string) {
           ? { userName: String(last.user_name || "Member"), content: String(last.content || ""), createdAt: String(last.created_at || "") }
           : null,
         unread,
+        muted: mutedRooms.has(id),
         sortAt: time(last?.created_at) || time(r.created_at),
       };
     })
@@ -79,9 +101,10 @@ export async function listRooms(user: User, token: string) {
       name: room.name,
       last: room.last,
       unread: room.unread,
+      muted: room.muted,
     })),
     availableServices,
-    totalUnread: out.reduce((n, r) => n + r.unread, 0),
+    totalUnread: out.filter((r) => !r.muted).reduce((n, r) => n + r.unread, 0),
   };
 }
 

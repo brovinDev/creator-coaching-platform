@@ -9,6 +9,6 @@ export async function GET(req: NextRequest) {
   // The room the reader has open is left out: it is on screen, so it counts as read.
   const exclude = req.nextUrl.searchParams.get("exclude");
   const result = await listRooms(session.user, await getNocodeToken()).catch(() => null);
-  const unread = result ? result.rooms.filter((r) => r.id !== exclude).reduce((n, r) => n + r.unread, 0) : 0;
+  const unread = result ? result.rooms.filter((r) => r.id !== exclude && !r.muted).reduce((n, r) => n + r.unread, 0) : 0;
   return NextResponse.json({ unread });
 }

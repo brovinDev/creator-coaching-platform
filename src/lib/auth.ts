@@ -21,10 +21,16 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         try {
           // The code is used up here, so it cannot sign anyone in a second time.
           const checked = await checkOtp(email, code, { consume: true });
-          if (!checked.ok) return null;
+          if (!checked.ok) {
+            console.warn("[auth] code refused:", checked.error);
+            return null;
+          }
 
           const user = await findActiveUser(email);
-          if (!user) return null;
+          if (!user) {
+            console.warn("[auth] code accepted but no active account for", email);
+            return null;
+          }
 
           const name = [user.firstName, user.lastName].filter(Boolean).join(" ").replace(/\s\.$/, "");
           const systemToken = process.env.NOCODE_SYSTEM_TOKEN || "";

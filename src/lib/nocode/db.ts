@@ -42,6 +42,7 @@ export const MODULES = {
   message_rooms: "message_rooms",
   room_messages: "room_messages",
   room_reads: "room_reads",
+  message_reactions: "message_reactions",
 } as const;
 
 type Row = Record<string, unknown>;
@@ -173,4 +174,5 @@ export const nocodeDb = {
   messageRooms: new NocodeModel(MODULES.message_rooms),
   roomMessages: new NocodeModel(MODULES.room_messages),
   roomReads: new NocodeModel(MODULES.room_reads),
+  messageReactions: new NocodeModel(MODULES.message_reactions),
 };

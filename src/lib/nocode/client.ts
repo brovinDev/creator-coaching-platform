@@ -113,7 +113,13 @@ export async function nocodeUserByEmail(email: string, token: string): Promise<N
   try {
     return await request<NocodeUser>(`/api/open-slate/users/by-email?email=${encodeURIComponent(email)}`, { token });
   } catch (error) {
-    if (error instanceof NocodeApiError && error.status === 404) return null;
+    // Only the backend's own "no such account" answer means there is no account. Any other 404 is
+    // the route itself missing (the backend has not been updated yet), which must not be mistaken
+    // for a new person: that would try to create an account that already exists.
+    if (error instanceof NocodeApiError && error.status === 404) {
+      if ((error.data as { code?: string } | undefined)?.code === "USER_NOT_FOUND") return null;
+      throw new Error("The backend has no /api/open-slate/users/by-email route. Deploy the latest backend first.");
+    }
     throw error;
   }
 }

@@ -248,7 +248,7 @@ function PostCard({
               aria-pressed={post.liked}
               className="flex cursor-pointer items-center gap-1.5 font-medium hover:text-gray-900"
             >
-              <Heart className={cn("h-5 w-5", post.liked && "fill-red-500 text-red-500")} />
+              <Heart className={cn("h-5 w-5", post.liked && "fill-indigo-600 text-indigo-600")} />
               {post.likeCount}
             </button>
             <button
@@ -582,17 +582,51 @@ export function FeedView({
       className={cn(
         "flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium",
         pill ? "flex-1 justify-center border border-gray-200" : "w-full",
-        view === v.key ? "bg-gray-200 text-gray-900" : "text-gray-600 hover:bg-gray-100"
+        view === v.key ? "bg-indigo-50 text-indigo-700" : "text-gray-600 hover:bg-gray-100"
       )}
     >
       <v.icon className="h-5 w-5" /> {v.label}
       {v.key === "messages" && unread > 0 && (
-        <span className="ml-auto min-w-[20px] rounded-full bg-red-500 px-1.5 text-center text-xs font-bold leading-5 text-white">
+        <span className="ml-auto min-w-[20px] rounded-full bg-indigo-600 px-1.5 text-center text-xs font-bold leading-5 text-white">
           {unread > 99 ? "99+" : unread}
         </span>
       )}
     </button>
   );
+
+  // Messages fill the page below the top bar, like a chat app, with a slim switcher on the left.
+  if (view === "messages") {
+    return (
+      <div className="fixed inset-x-0 bottom-0 top-[65px] z-20 flex bg-white">
+        <nav className="flex w-16 shrink-0 flex-col items-center gap-3 border-r border-gray-200 py-5 sm:w-20">
+          {VIEWS.map((v) => (
+            <button
+              key={v.key}
+              type="button"
+              onClick={() => setView(v.key)}
+              title={v.label}
+              aria-label={v.label}
+              aria-current={view === v.key ? "page" : undefined}
+              className={cn(
+                "relative flex h-12 w-12 cursor-pointer items-center justify-center rounded-xl",
+                view === v.key ? "bg-indigo-50 text-indigo-600" : "text-gray-500 hover:bg-gray-100"
+              )}
+            >
+              <v.icon className="h-6 w-6" />
+              {v.key === "messages" && unread > 0 && (
+                <span className="absolute -right-1 -top-1 min-w-[18px] rounded-full bg-indigo-600 px-1 text-center text-[10px] font-bold leading-[18px] text-white">
+                  {unread > 99 ? "99+" : unread}
+                </span>
+              )}
+            </button>
+          ))}
+        </nav>
+        <div className="min-w-0 flex-1">
+          <MessagesView isCreator={isCreator} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[260px_minmax(0,640px)_1fr]">
@@ -605,14 +639,12 @@ export function FeedView({
         <nav className="mt-5 space-y-1">{VIEWS.map((v) => viewButton(v))}</nav>
       </aside>
 
-      <div className={cn("min-w-0 space-y-4", view === "messages" && "xl:col-span-2")}>
+      <div className="min-w-0 space-y-4">
         <div className="flex gap-2 lg:hidden">
           {VIEWS.map((v) => viewButton(v, true))}
         </div>
 
-        {view === "messages" && <MessagesView isCreator={isCreator} />}
-
-        {view === "feed" && isCreator && (
+        {isCreator && (
           <Card>
             <button
               type="button"

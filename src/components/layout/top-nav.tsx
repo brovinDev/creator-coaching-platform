@@ -151,7 +151,7 @@ export function TopNav({ role, user, logoUrl, brandName }: TopNavProps) {
                 <span className="relative">
                   <tab.icon className="h-5 w-5" />
                   {tab.label === "Feed" && unread > 0 && (
-                    <span className="absolute -right-2.5 -top-2 min-w-[16px] rounded-full bg-red-500 px-1 text-center text-[10px] font-bold leading-4 text-white">
+                    <span className="absolute -right-2.5 -top-2 min-w-[16px] rounded-full bg-indigo-600 px-1 text-center text-[10px] font-bold leading-4 text-white">
                       {unread > 99 ? "99+" : unread}
                     </span>
                   )}
