@@ -1,5 +1,5 @@
 # Open Slate — Creator Coaching Platform
-
+ 
 A TagMango-style platform where creators sell services (courses, webinars, coaching), take payments, run email automation and manage a community. Learners sign up from a creator's service link, never from the main signup page.
 
 This app is the UI and API layer. All data lives in the **nocode backend** (`../nocode-backend`), which also handles Razorpay payments and file storage.
