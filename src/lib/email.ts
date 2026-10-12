@@ -17,7 +17,7 @@ interface SendEmailOptions {
   html: string;
   /** Plain-text alternative sent alongside the HTML. */
   text?: string;
-  /** Display name shown to the recipient; the sending address stays the platform's. */
+  /** Display name shown to the recipient (default: the product name); the sending address stays the platform's. */
   fromName?: string;
   replyTo?: string;
 }
@@ -25,7 +25,8 @@ interface SendEmailOptions {
 export async function sendEmail({ to, subject, html, text, fromName, replyTo }: SendEmailOptions) {
   const address = process.env.EMAIL_FROM || process.env.SMTP_USER;
   // Strip anything that could break out of the quoted display name or inject a header.
-  const safeName = fromName?.replace(/[\r\n"<>]/g, "").trim();
+  // Without a name the inbox shows the part of the address before the @, so default to the product's.
+  const safeName = (fromName || process.env.NEXT_PUBLIC_APP_NAME || "Open Slate").replace(/[\r\n"<>]/g, "").trim();
   await transporter.sendMail({
     from: safeName && address ? `"${safeName}" <${address}>` : address,
     to,
