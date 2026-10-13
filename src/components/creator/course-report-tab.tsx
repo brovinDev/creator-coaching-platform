@@ -59,21 +59,58 @@ function Avatar() {
   );
 }
 
-/** The magnifying glass shown when a table has nothing to list. */
+/**
+ * The magnifying glass shown when a table has nothing to list, drawn here in the style of TagMango's.
+ * The glass sweeps about as if searching and the dots drift; both stop for people who ask for less motion.
+ */
 export function EmptyIllustration() {
   return (
-    <svg width="150" height="150" viewBox="0 0 150 150" aria-hidden>
-      <circle cx="68" cy="70" r="62" fill="#eceef2" />
-      <circle cx="68" cy="66" r="30" fill="#b9dcf7" />
-      <circle cx="68" cy="66" r="24" fill="#59aeea" />
-      <circle cx="68" cy="66" r="7" fill="#8cc7f2" />
-      <path d="M86 90l22 36" stroke="#c4752e" strokeWidth="9" strokeLinecap="round" />
-      <circle cx="122" cy="18" r="6" fill="#f2c230" />
-      <circle cx="26" cy="102" r="6" fill="#f2c230" />
-      <circle cx="138" cy="34" r="2.5" fill="#a99bd6" />
-      <circle cx="22" cy="44" r="2.5" fill="#a99bd6" />
-      <circle cx="42" cy="132" r="2.5" fill="#a99bd6" />
-      <circle cx="132" cy="108" r="2.5" fill="#f2c230" />
+    <svg width="150" height="150" viewBox="0 0 500 500" aria-hidden>
+      <style>{`
+        @keyframes eill-search {
+          0%, 100% { transform: translate(-14px, 6px) rotate(-7deg); }
+          50% { transform: translate(14px, -8px) rotate(7deg); }
+        }
+        @keyframes eill-float {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-14px); }
+        }
+        @keyframes eill-pulse {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.25); }
+        }
+        .eill-search { transform-origin: 266px 254px; animation: eill-search 3.2s ease-in-out infinite; }
+        .eill-float { animation: eill-float 3s ease-in-out infinite; }
+        .eill-pulse { transform-box: fill-box; transform-origin: center; animation: eill-pulse 2.4s ease-in-out infinite; }
+        .eill-d1 { animation-delay: -0.6s; }
+        .eill-d2 { animation-delay: -1.2s; }
+        .eill-d3 { animation-delay: -1.8s; }
+        @media (prefers-reduced-motion: reduce) {
+          .eill-search, .eill-float, .eill-pulse { animation: none; }
+        }
+      `}</style>
+      <circle cx="251" cy="240" r="185" fill="#f1f1f2" />
+      {/* drifting dots */}
+      <circle className="eill-float" cx="63" cy="136" r="10" fill="#b6b2d8" />
+      <circle className="eill-float eill-d1" cx="439" cy="109" r="10" fill="#b6b2d8" />
+      <circle className="eill-float eill-d2" cx="126" cy="425" r="10" fill="#b6b2d8" opacity="0.85" />
+      <circle className="eill-float eill-d3" cx="386" cy="55" r="5" fill="#eecb3a" />
+      <circle className="eill-pulse" cx="416" cy="65" r="19" fill="#eecb3a" />
+      <circle className="eill-float eill-d1" cx="109" cy="325" r="5" fill="#eecb3a" />
+      <circle className="eill-pulse eill-d2" cx="76" cy="305" r="20" fill="#f6d977" />
+      <circle className="eill-float eill-d3" cx="406" cy="370" r="10" fill="#f6d977" />
+      <circle className="eill-float" cx="94" cy="257" r="12.5" fill="#fffeff" />
+      <circle className="eill-float eill-d2" cx="401" cy="160" r="5" fill="#fffeff" />
+      {/* the glass, searching */}
+      <g className="eill-search">
+        <line x1="332" y1="372" x2="384" y2="468" stroke="#bf7f42" strokeWidth="30" strokeLinecap="round" />
+        <line x1="340" y1="376" x2="391" y2="470" stroke="#b5713e" strokeWidth="9" strokeLinecap="round" />
+        <line x1="316" y1="340" x2="332" y2="372" stroke="#c2d1e0" strokeWidth="30" />
+        <circle cx="266" cy="254" r="83" fill="none" stroke="#d2e0ea" strokeWidth="18" />
+        <circle cx="266" cy="254" r="74" fill="#8ec5ea" />
+        <path d="M200 262c13-41 56-64 97-51 19 6 33 18 43 33-9-20-26-35-48-42-41-13-84 10-97 51-7 22-3 45 7 63-7-17-9-36-2-54z" fill="#70afde" />
+        <circle cx="266" cy="254" r="20" fill="#fffeff" opacity="0.25" />
+      </g>
     </svg>
   );
 }
