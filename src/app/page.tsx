@@ -19,7 +19,14 @@ export default function HomePage() {
           }}
         />
 
-        <header className="relative z-10 mx-auto flex h-20 max-w-[1280px] items-center justify-between px-6">
+        {/* the bottom edge settles to one even indigo, so the colour below can continue from it */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-[5] h-[300px]"
+          style={{ background: "linear-gradient(to bottom, rgba(46,47,120,0) 0%, rgba(46,47,120,0.55) 55%, #2e2f78 100%)" }}
+        />
+
+        <header className="relative z-10 mx-auto flex h-[84px] max-w-[1590px] items-center justify-between px-6">
           <span className="flex items-center gap-3 text-2xl font-bold tracking-tight">
             <LogoMark size={44} />
             {process.env.NEXT_PUBLIC_APP_NAME || "Open Slate"}
@@ -37,7 +44,7 @@ export default function HomePage() {
           </nav>
         </header>
 
-        <div className="relative z-10 mx-auto flex min-h-[640px] max-w-4xl flex-col items-center justify-center px-4 pb-24 pt-10 text-center">
+        <div className="relative z-10 mx-auto flex min-h-[760px] max-w-4xl flex-col items-center justify-center px-4 pb-[180px] pt-6 text-center">
           <h1 className="text-5xl font-bold leading-[1.1] tracking-tight sm:text-7xl">
             Build your
             <br />
@@ -71,7 +78,17 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="py-16 px-4 bg-gray-50">
+      {/* indigo that lightens, step by step, into the page colour */}
+      <div
+        aria-hidden
+        className="-mt-px h-[260px]"
+        style={{
+          background:
+            "linear-gradient(to bottom, #2e2f78 0%, #4a4ca8 18%, #7f81cf 40%, #b9bae9 62%, #e3e4f8 82%, #f9fafb 100%)",
+        }}
+      />
+
+      <section className="px-4 pb-16 bg-gray-50">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-3xl font-bold text-center text-gray-900 mb-12">Everything You Need</h2>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
