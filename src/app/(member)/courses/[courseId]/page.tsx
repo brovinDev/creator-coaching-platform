@@ -13,6 +13,7 @@ import {
   ChevronLeft,
 } from "lucide-react";
 import { VideoPlayer } from "@/components/video-player";
+import { LessonDiscussion } from "@/components/student/lesson-discussion";
 import toast from "react-hot-toast";
 
 interface Resource {
@@ -41,6 +42,8 @@ interface Course {
   title: string;
   description: string | null;
   creatorName: string;
+  disableComments?: boolean;
+  disableQna?: boolean;
   modules: Module[];
 }
 
@@ -202,13 +205,22 @@ export default function StudentCoursePage({ params }: { params: Promise<{ course
               {/* Tab content */}
               <div className="px-6 py-5 flex-1">
                 {tab === "description" && (
-                  <div className="prose prose-sm max-w-none text-gray-700">
-                    {activeLesson.content ? (
-                      <div dangerouslySetInnerHTML={{ __html: activeLesson.content }} />
-                    ) : (
-                      <p className="text-gray-400">No description available.</p>
-                    )}
-                  </div>
+                  <>
+                    <div className="prose prose-sm max-w-none text-gray-700">
+                      {activeLesson.content ? (
+                        <div dangerouslySetInnerHTML={{ __html: activeLesson.content }} />
+                      ) : (
+                        <p className="text-gray-500">No description available for this chapter.</p>
+                      )}
+                    </div>
+                    <div className="mt-10">
+                      {course.disableComments ? (
+                        <p className="text-sm text-gray-500">Comments are turned off for this course.</p>
+                      ) : (
+                        <LessonDiscussion key={activeLesson.id} courseId={courseId} lessonId={activeLesson.id} kind="comment" />
+                      )}
+                    </div>
+                  </>
                 )}
                 {tab === "resources" && (() => {
                   let resources: Resource[] = [];
@@ -236,7 +248,11 @@ export default function StudentCoursePage({ params }: { params: Promise<{ course
                   );
                 })()}
                 {tab === "qna" && (
-                  <p className="text-sm text-gray-400">QnA coming soon.</p>
+                  course.disableQna ? (
+                    <p className="text-sm text-gray-500">QnA is turned off for this course.</p>
+                  ) : (
+                    <LessonDiscussion key={activeLesson.id} courseId={courseId} lessonId={activeLesson.id} kind="question" />
+                  )
                 )}
               </div>
             </>

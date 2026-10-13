@@ -47,3 +47,22 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ cou
     replies: replies.map(shape),
   });
 }
+
+/** Delete a comment and the replies under it. The author or the course's creator may do this. */
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ courseId: string; commentId: string }> }) {
+  const { courseId, commentId } = await params;
+  const session = await auth();
+  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const token = await getNocodeToken();
+  const course = await nocodeDb.courses.findUnique({ id: courseId }, token);
+  const comment = await nocodeDb.lessonComments.findUnique({ id: commentId, course_id: courseId }, token);
+  if (!course || !comment) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const allowed = text(comment.user_id) === session.user.id || String(course.creator_id) === session.user.id;
+  if (!allowed) return NextResponse.json({ error: "You can only delete your own comments" }, { status: 403 });
+
+  await nocodeDb.lessonComments.deleteWhere({ parent_id: commentId }, token);
+  await nocodeDb.lessonComments.delete(commentId, token);
+  return NextResponse.json({ ok: true });
+}

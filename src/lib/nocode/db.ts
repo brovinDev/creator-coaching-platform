@@ -43,7 +43,7 @@ export const MODULES = {
   room_messages: "room_messages",
   room_reads: "room_reads",
   message_reactions: "message_reactions",
-  lesson_comments: "lesson_comments",
+  lesson_discussions: "lesson_discussions",
   course_reviews: "course_reviews",
 } as const;
 
@@ -177,6 +177,6 @@ export const nocodeDb = {
   roomMessages: new NocodeModel(MODULES.room_messages),
   roomReads: new NocodeModel(MODULES.room_reads),
   messageReactions: new NocodeModel(MODULES.message_reactions),
-  lessonComments: new NocodeModel(MODULES.lesson_comments),
+  lessonComments: new NocodeModel(MODULES.lesson_discussions),
   courseReviews: new NocodeModel(MODULES.course_reviews),
 };

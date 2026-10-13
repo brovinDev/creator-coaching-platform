@@ -14,6 +14,8 @@ import {
   ChevronLeft,
 } from "lucide-react";
 import { VideoPlayer } from "@/components/video-player";
+import { LessonDiscussion } from "@/components/student/lesson-discussion";
+import { themeVars } from "@/lib/branding-colors";
 
 interface Resource {
   name: string;
@@ -42,6 +44,8 @@ interface Course {
   description: string | null;
   creatorName: string;
   creatorAvatar: string | null;
+  disableComments?: boolean;
+  disableQna?: boolean;
   modules: Module[];
 }
 
@@ -58,6 +62,15 @@ export default function PreviewCoursePage({ params }: { params: Promise<{ course
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   useEffect(() => { fetchCourse(); }, [courseId]);
+
+  // The creator's own logo and theme colour, so the preview looks like what learners get.
+  const [brand, setBrand] = useState<{ logoUrl: string; themeColor: string }>({ logoUrl: "", themeColor: "" });
+  useEffect(() => {
+    fetch("/api/branding")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((b) => { if (b) setBrand({ logoUrl: b.logoUrl || "", themeColor: b.themeColor || "" }); })
+      .catch(() => {});
+  }, []);
 
   async function fetchCourse() {
     const res = await fetch(`/api/student/courses/${courseId}`);
@@ -106,7 +119,7 @@ export default function PreviewCoursePage({ params }: { params: Promise<{ course
     .toUpperCase();
 
   return (
-    <div className="min-h-screen bg-white flex flex-col">
+    <div className="min-h-screen bg-white flex flex-col" style={themeVars(brand.themeColor)}>
       {/* Slim top bar */}
       <div className="flex items-center gap-3 px-4 py-2.5 border-b border-gray-200 bg-white shrink-0">
         <button
@@ -115,13 +128,17 @@ export default function PreviewCoursePage({ params }: { params: Promise<{ course
         >
           <ArrowLeft className="h-5 w-5 text-gray-600" />
         </button>
-        {course.creatorAvatar ? (
+        {brand.logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={brand.logoUrl} alt="" className="h-10 w-auto max-w-[140px] rounded object-contain" />
+        ) : course.creatorAvatar ? (
           <img src={course.creatorAvatar} alt="" className="w-7 h-7 rounded-md object-cover" />
         ) : (
           <div className="w-7 h-7 rounded-md bg-indigo-600 flex items-center justify-center text-[10px] font-bold text-white">
             {creatorInitials}
           </div>
         )}
+        {brand.logoUrl && <span className="h-6 w-px bg-gray-200" />}
         <span className="text-sm font-medium text-gray-900 truncate">{course.title}</span>
       </div>
 
@@ -181,13 +198,22 @@ export default function PreviewCoursePage({ params }: { params: Promise<{ course
               {/* Tab content */}
               <div className="px-6 py-5 flex-1">
                 {tab === "description" && (
-                  <div className="prose prose-sm max-w-none text-gray-700">
-                    {activeLesson.content ? (
-                      <div dangerouslySetInnerHTML={{ __html: activeLesson.content }} />
-                    ) : (
-                      <p className="text-gray-400">No description available.</p>
-                    )}
-                  </div>
+                  <>
+                    <div className="prose prose-sm max-w-none text-gray-700">
+                      {activeLesson.content ? (
+                        <div dangerouslySetInnerHTML={{ __html: activeLesson.content }} />
+                      ) : (
+                        <p className="text-gray-500">No description available for this chapter.</p>
+                      )}
+                    </div>
+                    <div className="mt-10">
+                      {course.disableComments ? (
+                        <p className="text-sm text-gray-500">Comments are turned off for this course.</p>
+                      ) : (
+                        <LessonDiscussion key={activeLesson.id} courseId={courseId} lessonId={activeLesson.id} kind="comment" />
+                      )}
+                    </div>
+                  </>
                 )}
                 {tab === "resources" && (() => {
                   let resources: Resource[] = [];
@@ -215,7 +241,11 @@ export default function PreviewCoursePage({ params }: { params: Promise<{ course
                   );
                 })()}
                 {tab === "qna" && (
-                  <p className="text-sm text-gray-400">QnA coming soon.</p>
+                  course.disableQna ? (
+                    <p className="text-sm text-gray-500">QnA is turned off for this course.</p>
+                  ) : (
+                    <LessonDiscussion key={activeLesson.id} courseId={courseId} lessonId={activeLesson.id} kind="question" />
+                  )
                 )}
               </div>
             </>

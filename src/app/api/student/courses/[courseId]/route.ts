@@ -64,6 +64,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ cour
     description: course.description,
     creatorName,
     creatorAvatar,
+    disableComments: course.disable_comments === true || course.disable_comments === "true",
+    disableQna: course.disable_qna === true || course.disable_qna === "true",
     modules: modulesWithLessons,
   });
 }
