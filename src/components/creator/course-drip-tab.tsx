@@ -41,7 +41,7 @@ const TYPES: { key: DripType; label: string; hint: string }[] = [
 const chapters = (n: number) => `${n} Published Chapter${n === 1 ? "" : "s"}`;
 
 /** The "?" beside a drip type, with the explanation in a dark bubble on hover or focus. */
-function Hint({ text }: { text: string }) {
+export function Hint({ text }: { text: string }) {
   return (
     <span className="group/hint relative inline-flex">
       <button type="button" aria-label="What is this?" className="cursor-pointer text-gray-800">
@@ -65,7 +65,21 @@ const iso = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.ge
  * A date box that opens a calendar. Days before today are greyed out and cannot be picked,
  * today has an outline and the chosen day is filled.
  */
-function DateBox({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+export function DateBox({
+  value,
+  onChange,
+  allowPast = false,
+  bare = false,
+  placeholder = "Select date",
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  /** Drip dates must be in the future; a filter can pick any day. */
+  allowPast?: boolean;
+  /** No border or fixed width, for use inside a joined range box. */
+  bare?: boolean;
+  placeholder?: string;
+}) {
   const todayIso = iso(new Date());
   const start = value ? new Date(`${value}T00:00:00`) : new Date();
   const [open, setOpen] = useState(false);
@@ -95,12 +109,16 @@ function DateBox({ value, onChange }: { value: string; onChange: (v: string) => 
         onKeyDown={(e) => {
           if (e.key === "Escape") setOpen(false);
         }}
-        className={`flex h-[50px] w-[218px] cursor-pointer items-center justify-between rounded-md border bg-white px-4 ${
-          open ? "border-indigo-600" : "border-gray-200"
-        }`}
+        className={
+          bare
+            ? "flex h-[50px] w-[170px] cursor-pointer items-center justify-between bg-transparent px-4"
+            : `flex h-[50px] w-[218px] cursor-pointer items-center justify-between rounded-md border bg-white px-4 ${
+                open ? "border-indigo-600" : "border-gray-200"
+              }`
+        }
       >
-        <span className={`text-lg ${value ? (open ? "text-indigo-600" : "text-black") : "text-gray-500"}`}>{value || "Select date"}</span>
-        <Calendar className="h-5 w-5 text-gray-800" />
+        <span className={`text-lg ${value ? (open ? "text-indigo-600" : "text-black") : "text-gray-500"}`}>{value || placeholder}</span>
+        {!bare && <Calendar className="h-5 w-5 text-gray-800" />}
       </button>
 
       {open && (
@@ -140,7 +158,7 @@ function DateBox({ value, onChange }: { value: string; onChange: (v: string) => 
               <div className="grid grid-cols-7">
                 {cells.map((day) => {
                   const key = iso(day);
-                  const past = key < todayIso;
+                  const past = !allowPast && key < todayIso;
                   const selected = key === value;
                   const today = key === todayIso;
                   const inMonth = day.getMonth() === view.month;

@@ -60,7 +60,7 @@ function Avatar() {
 }
 
 /** The magnifying glass shown when a table has nothing to list. */
-function EmptyIllustration() {
+export function EmptyIllustration() {
   return (
     <svg width="150" height="150" viewBox="0 0 150 150" aria-hidden>
       <circle cx="68" cy="70" r="62" fill="#eceef2" />
