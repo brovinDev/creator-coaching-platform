@@ -35,6 +35,8 @@ function mapLesson(l: Record<string, unknown>) {
     moduleId: l.module_id,
     resources: l.resources || null,
     isFree: l.is_free === true || l.is_free === "true",
+    videoName: typeof l.video_name === "string" ? l.video_name : "",
+    videoSize: typeof l.video_size === "string" ? l.video_size : "",
   };
 }
 

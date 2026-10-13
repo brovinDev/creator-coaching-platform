@@ -23,6 +23,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (data.thumbnail !== undefined) updateFields.thumbnail = data.thumbnail;
   if (data.resources !== undefined) updateFields.resources = data.resources;
   if (data.position !== undefined) updateFields.position = data.position;
+  if (data.videoName !== undefined) updateFields.video_name = String(data.videoName ?? "");
+  if (data.videoSize !== undefined) updateFields.video_size = String(data.videoSize ?? "");
   if (data.isFree !== undefined) updateFields.is_free = data.isFree ? "true" : "false";
 
   const updated = await nocodeDb.lessons.update(lessonId, updateFields, token);

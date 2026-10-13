@@ -2,8 +2,6 @@
 
 import { useEffect, useState, useRef, use } from "react";
 import { useRouter } from "next/navigation";
-import { Modal } from "@/components/ui/modal";
-import { FileUpload } from "@/components/file-upload";
 import {
   ArrowLeft,
   Plus,
@@ -44,6 +42,7 @@ import { CourseCommentsTab } from "@/components/creator/course-comments-tab";
 import { CourseQnaTab } from "@/components/creator/course-qna-tab";
 import { CourseAssignmentsTab } from "@/components/creator/course-assignments-tab";
 import { CourseReviewsTab } from "@/components/creator/course-reviews-tab";
+import { VideoDialog } from "@/components/creator/video-dialog";
 
 interface Resource {
   name: string;
@@ -60,6 +59,8 @@ interface Lesson {
   position: number;
   resources: string | null;
   isFree?: boolean;
+  videoName?: string;
+  videoSize?: string;
 }
 
 interface Module {
@@ -84,6 +85,16 @@ type VideoMode = "upload" | "url";
 
 /** Characters the editor stores HTML-escaped inside pasted links (a Vimeo embed URL arrives with &amp;). */
 const decodeUrl = (url: string) => url.replace(/&amp;/g, "&");
+/** "sample-5s.mp4" from the end of an upload address, for videos saved before the name was kept. */
+const fileNameFrom = (url: string) => {
+  try {
+    return decodeURIComponent(new URL(url).pathname.split("/").pop() || "Video");
+  } catch {
+    return "Video";
+  }
+};
+const formatSize = (bytes: number) =>
+  bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(2)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
 const isFileUrl = (url: string) => /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(url) || /res\.cloudinary\.com/.test(url);
 
 const SIDEBAR: { key: string; label: string; icon: React.ComponentType<{ className?: string }>; group: 1 | 2 }[] = [
@@ -183,7 +194,6 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
   // Section (module) state
   const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
   const [editingSectionTitle, setEditingSectionTitle] = useState("");
-  const [sectionMenu, setSectionMenu] = useState<string | null>(null);
 
   // Chapter (lesson) state
   const [expandedChapters, setExpandedChapters] = useState<Set<string>>(new Set());
@@ -264,7 +274,6 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
   }
 
   async function deleteSection(moduleId: string) {
-    setSectionMenu(null);
     if (!confirm("Delete this section and all its chapters?")) return;
     await fetch(`/api/courses/${courseId}/modules/${moduleId}`, { method: "DELETE" });
     toast.success("Section deleted");
@@ -523,33 +532,24 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
                           {mod.title}
                         </button>
                       )}
-                      <div className="relative pr-4">
+                      <div className="flex items-center gap-2 pr-4">
                         <button
-                          onClick={() => setSectionMenu(sectionMenu === mod.id ? null : mod.id)}
-                          aria-label="Section options"
-                          className="cursor-pointer p-1 text-gray-800 hover:text-black"
+                          onClick={() => { setEditingSectionId(mod.id); setEditingSectionTitle(mod.title); }}
+                          aria-label="Rename section"
+                          className="flex h-[30px] w-[30px] cursor-pointer items-center justify-center rounded-full bg-gray-200 hover:bg-gray-300"
                         >
-                          <GripVertical className="h-5 w-5" />
+                          <Pencil className="h-3.5 w-3.5 text-gray-800" />
                         </button>
-                        {sectionMenu === mod.id && (
-                          <>
-                            <div className="fixed inset-0 z-10" onClick={() => setSectionMenu(null)} />
-                            <div className="absolute right-4 top-full z-20 w-40 rounded-lg border border-gray-200 bg-white py-1.5 shadow-lg">
-                              <button
-                                onClick={() => { setSectionMenu(null); setEditingSectionId(mod.id); setEditingSectionTitle(mod.title); }}
-                                className="w-full cursor-pointer px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
-                              >
-                                Rename
-                              </button>
-                              <button
-                                onClick={() => deleteSection(mod.id)}
-                                className="w-full cursor-pointer px-4 py-2 text-left text-sm text-red-500 hover:bg-red-50"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          </>
-                        )}
+                        <button
+                          onClick={() => deleteSection(mod.id)}
+                          aria-label="Delete section"
+                          className="flex h-[30px] w-[30px] cursor-pointer items-center justify-center rounded-full bg-gray-200 hover:bg-gray-300"
+                        >
+                          <Trash2 className="h-3.5 w-3.5 text-gray-800" />
+                        </button>
+                        <span className="p-1 text-gray-800">
+                          <GripVertical className="h-5 w-5" />
+                        </span>
                       </div>
                     </div>
 
@@ -635,7 +635,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
                                     <Caret open={isExpanded} />
                                     <span className="shrink-0 text-lg font-semibold text-black">Chapter {lessonIdx + 1}:</span>
                                     {lesson.videoUrl ? (
-                                      isFileUrl(lesson.videoUrl) ? <MdPlayCircle className="h-5 w-5 shrink-0 text-gray-800" /> : <MdLink className="h-5 w-5 shrink-0 text-gray-800" />
+                                      isFileUrl(lesson.videoUrl) ? <MdPlayCircle className="h-6 w-6 shrink-0 text-[#4a4a5a]" /> : <MdLink className="h-5 w-5 shrink-0 text-gray-800" />
                                     ) : (
                                       <MdInsertDriveFile className="h-5 w-5 shrink-0 text-gray-800" />
                                     )}
@@ -746,26 +746,48 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
                                   )}
 
                                   {/* Main content item */}
-                                  {lesson.videoUrl && (
+                                  {lesson.videoUrl && isFileUrl(lesson.videoUrl) && (
+                                    <div className="flex items-center gap-4 rounded-lg bg-white px-5 py-4">
+                                      <div className="flex h-[60px] w-[80px] shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#0f1c3f]">
+                                        {lesson.thumbnail ? (
+                                          // eslint-disable-next-line @next/next/no-img-element
+                                          <img src={lesson.thumbnail} alt="" className="h-full w-full object-cover" />
+                                        ) : (
+                                          <MdPlayArrow className="h-8 w-8 text-white" />
+                                        )}
+                                      </div>
+                                      <div className="min-w-0 flex-1">
+                                        <p className="truncate text-lg font-semibold text-black">{lesson.videoName || fileNameFrom(lesson.videoUrl)}</p>
+                                        <p className="mt-0.5 text-sm text-gray-600">
+                                          {(lesson.videoName || fileNameFrom(lesson.videoUrl)).split(".").pop()?.toUpperCase() || "VIDEO"}
+                                          {lesson.videoSize && Number(lesson.videoSize) > 0 ? ` \u2022 ${formatSize(Number(lesson.videoSize))}` : ""}
+                                        </p>
+                                      </div>
+                                      <button
+                                        onClick={() => setShowVideoModal({ moduleId: mod.id, lessonId: lesson.id, mode: "upload" })}
+                                        aria-label="Edit content"
+                                        className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full bg-gray-200 hover:bg-gray-300"
+                                      >
+                                        <Pencil className="h-4 w-4 text-gray-800" />
+                                      </button>
+                                    </div>
+                                  )}
+                                  {lesson.videoUrl && !isFileUrl(lesson.videoUrl) && (
                                     <div className="flex items-center gap-4 rounded-lg bg-white p-5">
                                       <div className="flex h-[67px] w-[91px] shrink-0 items-center justify-center overflow-hidden bg-[#0f1c3f]">
                                         {lesson.thumbnail ? (
                                           // eslint-disable-next-line @next/next/no-img-element
                                           <img src={lesson.thumbnail} alt="" className="h-full w-full object-cover" />
-                                        ) : isFileUrl(lesson.videoUrl) ? (
-                                          <MdPlayArrow className="h-9 w-9 text-white" />
                                         ) : (
                                           <MdLink className="h-9 w-9 text-white" />
                                         )}
                                       </div>
                                       <div className="min-w-0 flex-1">
-                                        <p className="text-lg font-semibold text-black">
-                                          {isFileUrl(lesson.videoUrl) ? "Video" : "Embedded Link"}
-                                        </p>
+                                        <p className="text-lg font-semibold text-black">Embedded Link</p>
                                         <p className="break-all text-base leading-6 text-indigo-600">{decodeUrl(lesson.videoUrl)}</p>
                                       </div>
                                       <button
-                                        onClick={() => setShowVideoModal({ moduleId: mod.id, lessonId: lesson.id, mode: isFileUrl(lesson.videoUrl!) ? "upload" : "url" })}
+                                        onClick={() => setShowVideoModal({ moduleId: mod.id, lessonId: lesson.id, mode: "url" })}
                                         aria-label="Edit content"
                                         className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center self-start rounded-full bg-gray-200 hover:bg-gray-300"
                                       >
@@ -805,14 +827,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
                                         <Pencil className="h-4 w-4 text-gray-800" />
                                       </button>
                                     </div>
-                                  ) : (
-                                    <button
-                                      onClick={() => setEditingDescription({ moduleId: mod.id, lessonId: lesson.id, content: "" })}
-                                      className="flex cursor-pointer items-center gap-2 text-base text-indigo-600 hover:underline"
-                                    >
-                                      <Plus className="h-4 w-4" /> Add chapter description
-                                    </button>
-                                  )}
+                                  ) : null}
 
                                   {/* Resources */}
                                   {resources.length > 0 && (
@@ -837,6 +852,14 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
                                   )}
 
                                   <div className="flex flex-wrap items-center gap-4">
+                                    {!hasDescription && !isEditingDesc && (
+                                      <button
+                                        onClick={() => setEditingDescription({ moduleId: mod.id, lessonId: lesson.id, content: "" })}
+                                        className="flex h-[45px] cursor-pointer items-center gap-2 rounded-md bg-gray-200 px-5 text-base font-semibold text-black hover:bg-gray-300"
+                                      >
+                                        <Plus className="h-4 w-4" /> Add description
+                                      </button>
+                                    )}
                                     <button
                                       onClick={() => {
                                         resourceTargetRef.current = { moduleId: mod.id, lessonId: lesson.id };
@@ -963,29 +986,29 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
         </main>
       </div>
 
-      {/* Video / embedded link modal */}
-      <Modal
-        open={showVideoModal !== null}
-        onClose={() => setShowVideoModal(null)}
-        title={showVideoModal?.mode === "url" ? "Embedded link" : "Upload video"}
-      >
-        {showVideoModal && (
-          <VideoUploadContent
-            initialMode={showVideoModal.mode}
-            currentUrl={course.modules
-              .find((m) => m.id === showVideoModal.moduleId)
-              ?.lessons.find((l) => l.id === showVideoModal.lessonId)?.videoUrl || ""}
-            currentThumb={course.modules
-              .find((m) => m.id === showVideoModal.moduleId)
-              ?.lessons.find((l) => l.id === showVideoModal.lessonId)?.thumbnail || course.defaultThumbnail || ""}
-            onSave={async (videoUrl, thumbnail) => {
-              await updateChapter(showVideoModal.moduleId, showVideoModal.lessonId, { videoUrl, thumbnail });
-              toast.success("Saved");
-              setShowVideoModal(null);
-            }}
-          />
-        )}
-      </Modal>
+      {/* Video / embedded link dialog */}
+      {showVideoModal && (
+        <VideoDialog
+          key={`${showVideoModal.lessonId}-${showVideoModal.mode}`}
+          mode={showVideoModal.mode}
+          currentUrl={course.modules
+            .find((m) => m.id === showVideoModal.moduleId)
+            ?.lessons.find((l) => l.id === showVideoModal.lessonId)?.videoUrl || ""}
+          currentThumb={course.modules
+            .find((m) => m.id === showVideoModal.moduleId)
+            ?.lessons.find((l) => l.id === showVideoModal.lessonId)?.thumbnail || course.defaultThumbnail || ""}
+          onSave={async (videoUrl, thumbnail, file) => {
+            await updateChapter(showVideoModal.moduleId, showVideoModal.lessonId, {
+              videoUrl,
+              thumbnail,
+              ...(file ? { videoName: file.name, videoSize: String(file.size) } : {}),
+            });
+            toast.success("Saved");
+            setShowVideoModal(null);
+          }}
+          onClose={() => setShowVideoModal(null)}
+        />
+      )}
 
       {/* Hidden file input for resource uploads */}
       <input
@@ -1010,88 +1033,5 @@ function FreeInfo() {
         Making this chapter free, will show this chapter to the customer who&rsquo;s seeing the rest of the course as locked and is prompted to upgrade. You can show a course as locked to customers who haven&rsquo;t purchased it yet. This can be done from the Information tab.
       </span>
     </span>
-  );
-}
-
-function VideoUploadContent({
-  initialMode,
-  currentUrl,
-  currentThumb,
-  onSave,
-}: {
-  initialMode: VideoMode;
-  currentUrl: string;
-  currentThumb: string;
-  onSave: (videoUrl: string, thumbnail: string) => void;
-}) {
-  const [videoUrl, setVideoUrl] = useState(currentUrl);
-  const [thumbnail, setThumbnail] = useState(currentThumb);
-  const [mode, setMode] = useState<VideoMode>(initialMode);
-
-  return (
-    <div className="space-y-4">
-      {/* Video preview */}
-      {videoUrl && isFileUrl(videoUrl) && (
-        <div className="relative overflow-hidden rounded-lg bg-black">
-          <video src={videoUrl} controls className="max-h-64 w-full object-contain" />
-          <button
-            onClick={() => setVideoUrl("")}
-            className="absolute right-2 top-2 cursor-pointer rounded bg-black/50 px-2 py-1 text-xs text-gray-300 hover:text-white"
-          >
-            Replace video
-          </button>
-        </div>
-      )}
-
-      {/* Upload area */}
-      {!(videoUrl && isFileUrl(videoUrl)) && (
-        <div>
-          <div className="mb-3 flex gap-2">
-            <button
-              onClick={() => setMode("upload")}
-              className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-                mode === "upload" ? "bg-indigo-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
-            >
-              <Upload className="h-3 w-3" /> Upload
-            </button>
-            <button
-              onClick={() => setMode("url")}
-              className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-                mode === "url" ? "bg-indigo-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
-            >
-              <MdLink className="h-3.5 w-3.5" /> Link
-            </button>
-          </div>
-          {mode === "upload" ? (
-            <FileUpload type="video" value={videoUrl} onChange={setVideoUrl} />
-          ) : (
-            <input
-              type="text"
-              placeholder="https://youtube.com/... or Vimeo / video URL"
-              value={videoUrl}
-              onChange={(e) => setVideoUrl(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-indigo-600 focus:outline-none"
-            />
-          )}
-        </div>
-      )}
-
-      {/* Thumbnail */}
-      <div>
-        <p className="mb-1 text-sm font-medium text-gray-700">Add thumbnail (optional)</p>
-        <p className="mb-2 text-xs text-gray-400">You can upload a thumbnail for your video.</p>
-        <FileUpload type="image" value={thumbnail} onChange={setThumbnail} />
-      </div>
-
-      <button
-        onClick={() => onSave(videoUrl.trim(), thumbnail)}
-        disabled={!videoUrl.trim()}
-        className="w-full cursor-pointer rounded-md bg-indigo-600 py-3 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-40"
-      >
-        Save
-      </button>
-    </div>
   );
 }
