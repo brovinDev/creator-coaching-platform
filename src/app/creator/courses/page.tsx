@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ReorderCoursesPanel } from "@/components/creator/reorder-courses-panel";
-import { BookOpen, ChevronDown, ListFilter, MoreHorizontal, Plus, Search, X } from "lucide-react";
+import { useProductName } from "@/components/product-name";
+import { BookOpen, Check, ChevronDown, ListFilter, MoreHorizontal, Plus, Search, X } from "lucide-react";
 import toast from "react-hot-toast";
 
 interface Course {
@@ -39,7 +40,10 @@ export default function CoursesPage() {
   const [newTitle, setNewTitle] = useState("");
   const [creating, setCreating] = useState(false);
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
+  const { one, One } = useProductName();
   const [reordering, setReordering] = useState(false);
+  const [servicesReady, setServicesReady] = useState(false);
+  const [noService, setNoService] = useState(false);
   const [unreadComments, setUnreadComments] = useState(0);
 
   const [services, setServices] = useState<ServiceOption[]>([]);
@@ -75,9 +79,15 @@ export default function CoursesPage() {
         course_id: s.course_id ? String(s.course_id) : null,
       })));
     }
+    setServicesReady(true);
   }
 
   function openCreateModal() {
+    // A course is sold through a service, so with none yet the first step is to make one.
+    if (servicesReady && services.length === 0) {
+      setNoService(true);
+      return;
+    }
     setShowCreate(true);
     setNewTitle("");
     setSelectedServiceIds(new Set());
@@ -350,6 +360,33 @@ export default function CoursesPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {noService && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) setNoService(false); }}
+          onKeyDown={(e) => { if (e.key === "Escape") setNoService(false); }}
+        >
+          <div className="w-full max-w-[650px] rounded-xl bg-white px-10 pb-12 pt-11 text-center shadow-xl">
+            <span className="mx-auto flex h-[68px] w-[68px] items-center justify-center rounded-full bg-green-600">
+              <Check className="h-10 w-10 text-white" strokeWidth={3.5} />
+            </span>
+            <h2 className="mt-5 text-[26px] font-semibold text-black">
+              No {One} - No Course <span aria-hidden>&#128579;</span>
+            </h2>
+            <p className="mx-auto mt-2 max-w-[560px] text-lg leading-7 text-gray-700">
+              Create your first {one} to start hosting courses, live workshops and sessions with your audience!
+            </p>
+            <button
+              onClick={() => router.push("/creator/services/new")}
+              autoFocus
+              className="mt-10 h-[47px] cursor-pointer rounded-full bg-indigo-600 px-8 text-lg font-semibold text-white hover:bg-indigo-700"
+            >
+              Create a {one}
+            </button>
+          </div>
         </div>
       )}
 

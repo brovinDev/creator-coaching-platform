@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LogoMark } from "@/components/auth/auth-shell";
 import { ArrowRight, BookOpen, Users, CreditCard, Zap } from "lucide-react";
 
 export default function HomePage() {
@@ -19,7 +20,10 @@ export default function HomePage() {
         />
 
         <header className="relative z-10 mx-auto flex h-20 max-w-[1280px] items-center justify-between px-6">
-          <span className="text-2xl font-bold tracking-tight">{process.env.NEXT_PUBLIC_APP_NAME || "Open Slate"}</span>
+          <span className="flex items-center gap-3 text-2xl font-bold tracking-tight">
+            <LogoMark size={44} />
+            {process.env.NEXT_PUBLIC_APP_NAME || "Open Slate"}
+          </span>
           <nav className="flex items-center gap-3">
             <Link href="/login" className="px-4 py-2 text-base font-medium text-white/90 hover:text-white">
               Login

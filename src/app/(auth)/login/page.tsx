@@ -6,7 +6,9 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import toast from "react-hot-toast";
-import { AuthShell } from "@/components/auth/auth-shell";
+import { AuthFooter, AuthShell, LogoMark } from "@/components/auth/auth-shell";
+
+const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME || "Open Slate";
 import { CodeInput, emptyCode } from "@/components/auth/code-input";
 
 /** Sign in with a code emailed to you. There is no password. */
@@ -70,73 +72,81 @@ export default function LoginPage() {
 
   if (step === "code") {
     return (
-      <AuthShell>
-        <button
-          onClick={() => setStep("email")}
-          className="mb-6 flex w-fit cursor-pointer items-center gap-2 text-lg text-gray-600 hover:text-black"
-        >
-          <ArrowLeft className="h-5 w-5" /> Back
-        </button>
-        <h1 className="text-[40px] font-semibold leading-tight text-black">Check your email</h1>
-        <p className="mt-3 text-xl text-gray-700">
-          We sent a 6-digit code to <strong className="font-semibold text-black">{email}</strong>
-        </p>
+      <AuthShell bare>
+        <div>
+          <LogoMark size={60} />
+          <button
+            onClick={() => setStep("email")}
+            className="mt-8 flex w-fit cursor-pointer items-center gap-2 text-lg text-gray-600 hover:text-black"
+          >
+            <ArrowLeft className="h-5 w-5" /> Back
+          </button>
+          <h1 className="mt-4 text-[40px] font-semibold leading-tight text-gray-700">Check your email</h1>
+          <p className="mt-3 text-[22px] text-black">
+            We sent a 6-digit code to <strong className="font-semibold">{email}</strong>
+          </p>
 
-        <div className="mt-8">
-          <CodeInput digits={digits} onChange={setDigits} onSubmit={verify} />
+          <div className="mt-8">
+            <CodeInput digits={digits} onChange={setDigits} onSubmit={verify} />
+          </div>
+
+          <button
+            onClick={verify}
+            disabled={loading}
+            className="mt-8 h-[56px] w-full cursor-pointer rounded-md bg-indigo-600 text-xl font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {loading ? "Signing in..." : "Login"}
+          </button>
+
+          <p className="mt-5 text-center text-lg text-gray-600">
+            {resendIn > 0 ? (
+              `Send a new code in ${resendIn}s`
+            ) : (
+              <button onClick={() => sendCode()} className="cursor-pointer font-medium text-indigo-600 hover:underline">
+                Send a new code
+              </button>
+            )}
+          </p>
         </div>
-
-        <button
-          onClick={verify}
-          disabled={loading}
-          className="mt-8 h-[56px] w-full cursor-pointer rounded-md bg-indigo-600 text-xl font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {loading ? "Signing in..." : "Login"}
-        </button>
-
-        <p className="mt-5 text-center text-lg text-gray-600">
-          {resendIn > 0 ? (
-            `Send a new code in ${resendIn}s`
-          ) : (
-            <button onClick={() => sendCode()} className="cursor-pointer font-medium text-indigo-600 hover:underline">
-              Send a new code
-            </button>
-          )}
-        </p>
+        <AuthFooter />
       </AuthShell>
     );
   }
 
   return (
-    <AuthShell>
-      <h1 className="text-[48px] font-semibold leading-[1.15] text-black">Welcome back!</h1>
-      <p className="mt-6 text-2xl text-black">Enter your email and we will send you a code to log in.</p>
+    <AuthShell bare>
+      <div>
+        <LogoMark size={60} />
+        <h1 className="mt-[33px] text-[48px] font-semibold leading-[1.15] text-gray-700">Continue to use {APP_NAME}</h1>
+        <p className="mt-4 text-[22px] text-black">Welcome back! Please enter your details.</p>
 
-      <form onSubmit={sendCode} className="mt-16 space-y-6">
-        <input
-          className="h-[62px] w-full rounded-md border border-gray-300 bg-white px-4 text-xl text-black placeholder:text-gray-600 focus:border-gray-500 focus:outline-none"
-          type="email"
-          placeholder="Enter email"
-          autoComplete="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
-        <button
-          type="submit"
-          disabled={!email.trim() || loading}
-          className="h-[56px] w-full cursor-pointer rounded-md bg-indigo-600 text-xl font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {loading ? "Sending code..." : "Send code"}
-        </button>
-      </form>
+        <form onSubmit={sendCode} className="mt-[85px]">
+          <input
+            className="h-[60px] w-full rounded-md border border-gray-300 bg-white px-4 text-xl text-black placeholder:text-gray-600 focus:border-gray-500 focus:outline-none"
+            type="email"
+            placeholder="Enter your email"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+          <button
+            type="submit"
+            disabled={!email.trim() || loading}
+            className="mt-10 h-[57px] w-full cursor-pointer rounded-md bg-indigo-600 text-xl font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {loading ? "Sending code..." : "Request OTP"}
+          </button>
+        </form>
 
-      <p className="mt-5 text-center text-lg text-black">
-        Don&rsquo;t have an account?{" "}
-        <Link href="/signup" className="font-medium text-[#1d86ff] hover:underline">
-          Sign up
-        </Link>
-      </p>
+        <p className="mt-12 text-center text-lg text-black">
+          Not registered yet?{" "}
+          <Link href="/signup" className="font-semibold text-[#1d86ff] hover:underline">
+            Sign Up
+          </Link>
+        </p>
+      </div>
+      <AuthFooter />
     </AuthShell>
   );
 }

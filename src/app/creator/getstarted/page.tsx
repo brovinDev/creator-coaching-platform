@@ -203,7 +203,7 @@ export default async function GetStartedPage() {
           icon={<MdLanguage className="h-6 w-6" />}
           title="Build a Landing Page"
           text={`Choose a template or build a landing page from scratch to promote your ${product}s to your audience and increase your conversions.`}
-          href="/creator/landing-pages"
+          href="/creator/page-builder"
         />
       </div>
     </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown, X } from "lucide-react";
 import { FaFacebook, FaInstagram, FaLinkedin, FaXTwitter, FaYoutube } from "react-icons/fa6";
@@ -80,6 +80,82 @@ function Choice({ label, on, onClick, wide }: { label: string; on: boolean; onCl
   );
 }
 
+/**
+ * The revenue question is a slider: drag the ring along the stops (or press the arrow keys, or click a
+ * label). It always rests on one of the stops.
+ */
+function RevenueSlider({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const trackRef = useRef<HTMLDivElement>(null);
+  const [dragging, setDragging] = useState(false);
+  const last = REVENUE.length - 1;
+  const index = Math.max(0, REVENUE.indexOf(value));
+  const stopLeft = (i: number) => `${((i + 0.5) / REVENUE.length) * 100}%`;
+
+  function moveTo(clientX: number) {
+    const el = trackRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const ratio = (clientX - rect.left) / rect.width;
+    const i = Math.min(last, Math.max(0, Math.round(ratio * REVENUE.length - 0.5)));
+    onChange(REVENUE[i]);
+  }
+
+  return (
+    <div>
+      <div
+        ref={trackRef}
+        className="relative h-[26px] cursor-pointer touch-none select-none"
+        onPointerDown={(e) => {
+          e.currentTarget.setPointerCapture(e.pointerId);
+          setDragging(true);
+          moveTo(e.clientX);
+        }}
+        onPointerMove={(e) => dragging && moveTo(e.clientX)}
+        onPointerUp={() => setDragging(false)}
+        onPointerCancel={() => setDragging(false)}
+      >
+        <span className="absolute left-[5.5%] right-[5.5%] top-1/2 h-px -translate-y-1/2 bg-gray-200" />
+        {REVENUE.map((r, i) => (
+          <span
+            key={r}
+            className="absolute top-1/2 h-[10px] w-[10px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-gray-300 bg-white"
+            style={{ left: stopLeft(i) }}
+          />
+        ))}
+        <span
+          role="slider"
+          tabIndex={0}
+          aria-label="Annual revenue"
+          aria-valuemin={0}
+          aria-valuemax={last}
+          aria-valuenow={index}
+          aria-valuetext={REVENUE[index]}
+          onKeyDown={(e) => {
+            if (e.key === "ArrowRight" || e.key === "ArrowUp") onChange(REVENUE[Math.min(last, index + 1)]);
+            if (e.key === "ArrowLeft" || e.key === "ArrowDown") onChange(REVENUE[Math.max(0, index - 1)]);
+          }}
+          className={`absolute top-1/2 h-[22px] w-[22px] -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-indigo-600 bg-white shadow focus:outline-none focus-visible:ring-4 focus-visible:ring-indigo-200 ${
+            dragging ? "cursor-grabbing" : "cursor-grab transition-[left] duration-150"
+          }`}
+          style={{ left: stopLeft(index) }}
+        />
+      </div>
+      <div className="mt-1 grid grid-cols-9">
+        {REVENUE.map((r) => (
+          <button
+            key={r}
+            type="button"
+            onClick={() => onChange(r)}
+            className={`cursor-pointer text-center text-lg text-black ${r === value ? "font-medium" : ""}`}
+          >
+            {r}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /** Sign-up step 2: the "about you" questions. Every one is optional and the whole step can be skipped. */
 export function AboutSurvey() {
   const router = useRouter();
@@ -131,29 +207,7 @@ export function AboutSurvey() {
           </Card>
 
           <Card title="2. What's your annual revenue from the coaching business?">
-            <div className="relative">
-              <div className="grid grid-cols-9">
-                {REVENUE.map((r) => {
-                  const on = revenue === r;
-                  return (
-                    <button
-                      key={r}
-                      type="button"
-                      onClick={() => setRevenue(r)}
-                      aria-pressed={on}
-                      className="flex cursor-pointer flex-col items-center gap-2 text-lg text-black"
-                    >
-                      <span
-                        className={`flex items-center justify-center rounded-full border bg-white ${
-                          on ? "h-[18px] w-[18px] border-2 border-indigo-600" : "h-[10px] w-[10px] border-gray-300"
-                        }`}
-                      />
-                      <span className={on ? "font-medium" : ""}>{r}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+            <RevenueSlider value={revenue} onChange={setRevenue} />
           </Card>
 
           <Card title="3. How do you know about us?">
