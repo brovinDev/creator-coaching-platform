@@ -20,6 +20,15 @@ export async function GET() {
     ? `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || "Creator"
     : "Creator";
 
+  // Which services each course is part of, for the Reorder panel.
+  const services = await nocodeDb.services.findMany({ where: { creator_id: session.user.id } }, token);
+  const servicesOf = new Map<string, string[]>();
+  for (const svc of services) {
+    for (const cid of String(svc.course_id || "").split(",").map((x) => x.trim()).filter(Boolean)) {
+      servicesOf.set(cid, [...(servicesOf.get(cid) ?? []), String(svc.title || "")]);
+    }
+  }
+
   const enriched = await Promise.all(
     courses.map(async (c) => {
       const modules = await nocodeDb.courseModules.findMany(
@@ -40,10 +49,15 @@ export async function GET() {
         creatorId: c.creator_id,
         creatorName,
         createdAt: c.created_at,
+        position: c.position === undefined || c.position === null || c.position === "" ? null : Number(c.position),
+        services: servicesOf.get(String(c.id)) ?? [],
         _count: { sections: modules.length, lectures: lessonCount },
       };
     })
   );
+
+  // The creator's own order first; courses never ordered keep newest-first after them.
+  enriched.sort((a, b) => (a.position ?? Infinity) - (b.position ?? Infinity));
 
   return NextResponse.json(enriched);
 }

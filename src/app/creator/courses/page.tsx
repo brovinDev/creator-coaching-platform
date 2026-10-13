@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { ReorderCoursesPanel } from "@/components/creator/reorder-courses-panel";
 import { BookOpen, ChevronDown, ListFilter, MoreHorizontal, Plus, Search, X } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -13,6 +15,7 @@ interface Course {
   thumbnail: string | null;
   published: boolean;
   creatorName: string;
+  services: string[];
   _count: { sections: number; lectures: number };
 }
 
@@ -36,6 +39,8 @@ export default function CoursesPage() {
   const [newTitle, setNewTitle] = useState("");
   const [creating, setCreating] = useState(false);
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
+  const [reordering, setReordering] = useState(false);
+  const [unreadComments, setUnreadComments] = useState(0);
 
   const [services, setServices] = useState<ServiceOption[]>([]);
   const [selectedServiceIds, setSelectedServiceIds] = useState<Set<string>>(new Set());
@@ -43,6 +48,14 @@ export default function CoursesPage() {
   const [showServiceDropdown, setShowServiceDropdown] = useState(false);
 
   useEffect(() => { fetchCourses(); fetchServices(); }, []);
+
+  // The unread count beside "Comments".
+  useEffect(() => {
+    fetch("/api/courses/comments?summary=1")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d && typeof d.unread === "number") setUnreadComments(d.unread); })
+      .catch(() => {});
+  }, []);
 
   async function fetchCourses() {
     const res = await fetch("/api/courses");
@@ -170,6 +183,18 @@ export default function CoursesPage() {
     <div className="mx-auto max-w-[1280px]" style={{ zoom: 0.8, fontFamily: "var(--font-poppins), sans-serif" }}>
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-[32px] font-semibold leading-tight text-black">Courses</h1>
+        <div className="flex items-center gap-5">
+          <Link href="/creator/courses/comments" className="text-lg font-semibold text-[#1d86ff] hover:underline">
+            Comments{unreadComments > 0 ? ` (${unreadComments})` : ""}
+          </Link>
+          {courses.length > 1 && (
+            <button
+              onClick={() => setReordering(true)}
+              className="h-11 cursor-pointer rounded-md bg-indigo-600 px-5 text-[15px] font-semibold text-white hover:bg-indigo-700"
+            >
+              Reorder courses
+            </button>
+          )}
         <button
           onClick={openCreateModal}
           className="flex h-11 cursor-pointer items-center gap-2 rounded-md bg-indigo-600 px-5 text-[15px] font-semibold text-white hover:bg-indigo-700"
@@ -177,6 +202,7 @@ export default function CoursesPage() {
           <Plus className="h-4 w-4" />
           Create
         </button>
+        </div>
       </div>
 
       <div className="mb-6 flex items-center gap-4">
@@ -247,7 +273,11 @@ export default function CoursesPage() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((course) => (
-            <div key={course.id} className="flex flex-col rounded-xl border border-gray-200 bg-white p-5">
+            <div
+              key={course.id}
+              onClick={() => router.push(`/creator/courses/${course.id}`)}
+              className="flex cursor-pointer flex-col rounded-xl border border-gray-200 bg-white p-5 transition-shadow hover:shadow-md"
+            >
               <div className="flex aspect-[16/9] items-center justify-center overflow-hidden rounded-lg bg-black">
                 {course.thumbnail ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -259,7 +289,7 @@ export default function CoursesPage() {
               <div className="mt-2 flex h-6 justify-end">
                 <span
                   className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase leading-5 ${
-                    course.published ? "bg-green-600 text-white" : "bg-gray-200 text-gray-600"
+                    course.published ? "bg-green-600 text-white" : "bg-[#e6e7ee] text-[#4a4a5a]"
                   }`}
                 >
                   {course.published ? "Published" : "Draft"}
@@ -270,7 +300,7 @@ export default function CoursesPage() {
               <p className="mt-1 text-[13px] text-gray-700">
                 {course._count.sections} sections &bull; {course._count.lectures} lectures
               </p>
-              <div className="mt-auto flex items-center gap-2 pt-4">
+              <div className="mt-auto flex items-center gap-2 pt-4" onClick={(e) => e.stopPropagation()}>
                 <button
                   onClick={() => router.push(`/creator/courses/${course.id}`)}
                   className="h-10 flex-1 cursor-pointer rounded-md bg-gray-200 text-[15px] font-semibold text-gray-900 hover:bg-gray-300"
@@ -321,6 +351,14 @@ export default function CoursesPage() {
             </div>
           ))}
         </div>
+      )}
+
+      {reordering && (
+        <ReorderCoursesPanel
+          courses={courses.map((c) => ({ id: c.id, title: c.title, published: c.published, services: c.services || [] }))}
+          onClose={() => setReordering(false)}
+          onSaved={fetchCourses}
+        />
       )}
 
       {showCreate && (
