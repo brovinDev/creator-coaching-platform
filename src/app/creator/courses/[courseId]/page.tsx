@@ -43,6 +43,7 @@ import { CourseReportTab } from "@/components/creator/course-report-tab";
 import { CourseCommentsTab } from "@/components/creator/course-comments-tab";
 import { CourseQnaTab } from "@/components/creator/course-qna-tab";
 import { CourseAssignmentsTab } from "@/components/creator/course-assignments-tab";
+import { CourseReviewsTab } from "@/components/creator/course-reviews-tab";
 
 interface Resource {
   name: string;
@@ -78,7 +79,7 @@ interface Course extends CourseInfo {
   _count: { enrollments: number };
 }
 
-type SidebarTab = "curriculum" | "information" | "drip" | "report" | "comments" | "qna" | "assignments";
+type SidebarTab = "curriculum" | "information" | "drip" | "report" | "comments" | "qna" | "assignments" | "reviews";
 type VideoMode = "upload" | "url";
 
 /** Characters the editor stores HTML-escaped inside pasted links (a Vimeo embed URL arrives with &amp;). */
@@ -416,7 +417,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
   }
 
   const sidebarLink = (key: string) => {
-    if (key === "curriculum" || key === "information" || key === "drip" || key === "report" || key === "comments" || key === "qna" || key === "assignments") setActiveTab(key);
+    if (key === "curriculum" || key === "information" || key === "drip" || key === "report" || key === "comments" || key === "qna" || key === "assignments" || key === "reviews") setActiveTab(key);
     else toast("Coming soon");
   };
 
@@ -933,6 +934,8 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
               onSaved={fetchCourse}
             />
           )}
+          {activeTab === "reviews" && <CourseReviewsTab key={course.id} courseId={course.id} />}
+
           {activeTab === "qna" && <CourseQnaTab key={course.id} courseId={course.id} />}
 
           {activeTab === "assignments" && <CourseAssignmentsTab key={course.id} />}

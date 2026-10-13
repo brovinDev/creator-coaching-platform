@@ -44,6 +44,7 @@ export const MODULES = {
   room_reads: "room_reads",
   message_reactions: "message_reactions",
   lesson_comments: "lesson_comments",
+  course_reviews: "course_reviews",
 } as const;
 
 type Row = Record<string, unknown>;
@@ -177,4 +178,5 @@ export const nocodeDb = {
   roomReads: new NocodeModel(MODULES.room_reads),
   messageReactions: new NocodeModel(MODULES.message_reactions),
   lessonComments: new NocodeModel(MODULES.lesson_comments),
+  courseReviews: new NocodeModel(MODULES.course_reviews),
 };
