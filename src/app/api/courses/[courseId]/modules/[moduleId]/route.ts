@@ -15,8 +15,12 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const course = await nocodeDb.courses.findUnique({ id: courseId, creator_id: session.user.id }, token);
   if (!course) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const { title } = await req.json();
-  const updated = await nocodeDb.courseModules.update(moduleId, { title }, token);
+  const { title, dripDays, dripDate } = await req.json();
+  const fields: Record<string, unknown> = {};
+  if (title !== undefined) fields.title = title;
+  if (dripDays !== undefined) fields.drip_days = String(dripDays ?? "");
+  if (dripDate !== undefined) fields.drip_date = String(dripDate ?? "");
+  const updated = await nocodeDb.courseModules.update(moduleId, fields, token);
 
   return NextResponse.json({
     id: updated.id ?? moduleId,

@@ -38,6 +38,7 @@ import {
 import toast from "react-hot-toast";
 import { RichTextEditor } from "@/components/rich-text-editor";
 import { CourseInfoTab, type CourseInfo } from "@/components/creator/course-info-tab";
+import { CourseDripTab, type DripType } from "@/components/creator/course-drip-tab";
 
 interface Resource {
   name: string;
@@ -60,17 +61,20 @@ interface Module {
   id: string;
   title: string;
   position: number;
+  dripDays?: string;
+  dripDate?: string;
   lessons: Lesson[];
 }
 
 interface Course extends CourseInfo {
   slug: string;
+  dripType?: string;
   published: boolean;
   modules: Module[];
   _count: { enrollments: number };
 }
 
-type SidebarTab = "curriculum" | "information";
+type SidebarTab = "curriculum" | "information" | "drip";
 type VideoMode = "upload" | "url";
 
 /** Characters the editor stores HTML-escaped inside pasted links (a Vimeo embed URL arrives with &amp;). */
@@ -408,7 +412,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
   }
 
   const sidebarLink = (key: string) => {
-    if (key === "curriculum" || key === "information") setActiveTab(key);
+    if (key === "curriculum" || key === "information" || key === "drip") setActiveTab(key);
     else toast("Coming soon");
   };
 
@@ -922,6 +926,22 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
               key={course.id}
               course={course}
               videoChapters={course.modules.flatMap((m) => m.lessons.filter((l) => l.videoUrl).map((l) => ({ moduleId: m.id, lessonId: l.id })))}
+              onSaved={fetchCourse}
+            />
+          )}
+          {activeTab === "drip" && (
+            <CourseDripTab
+              // Remount after a save so the saved values become the new starting point.
+              key={`${course.id}-${course.dripType || ""}-${course.modules.map((m) => `${m.id}:${m.dripDays}:${m.dripDate}`).join("|")}`}
+              courseId={course.id}
+              initialType={(course.dripType as DripType) || ""}
+              sections={course.modules.map((m) => ({
+                id: m.id,
+                title: m.title,
+                chapterCount: m.lessons.length,
+                dripDays: m.dripDays || "",
+                dripDate: m.dripDate || "",
+              }))}
               onSaved={fetchCourse}
             />
           )}

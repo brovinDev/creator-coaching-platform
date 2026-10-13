@@ -9,6 +9,7 @@ const TEXT_SETTINGS = [
   { api: "durationMinutes", db: "duration_minutes" },
   { api: "defaultThumbnail", db: "default_thumbnail" },
   { api: "validityDays", db: "validity_days" },
+  { api: "dripType", db: "drip_type" },
 ];
 const SWITCH_SETTINGS = [
   { api: "showAsLocked", db: "show_as_locked" },
@@ -43,6 +44,8 @@ function mapModule(m: Record<string, unknown>, lessons: Record<string, unknown>[
     title: m.title,
     position: m.position,
     courseId: m.course_id,
+    dripDays: typeof m.drip_days === "string" ? m.drip_days : "",
+    dripDate: typeof m.drip_date === "string" ? m.drip_date : "",
     lessons: lessons.map(mapLesson),
   };
 }
