@@ -39,6 +39,7 @@ import toast from "react-hot-toast";
 import { RichTextEditor } from "@/components/rich-text-editor";
 import { CourseInfoTab, type CourseInfo } from "@/components/creator/course-info-tab";
 import { CourseDripTab, type DripType } from "@/components/creator/course-drip-tab";
+import { CourseReportTab } from "@/components/creator/course-report-tab";
 
 interface Resource {
   name: string;
@@ -74,7 +75,7 @@ interface Course extends CourseInfo {
   _count: { enrollments: number };
 }
 
-type SidebarTab = "curriculum" | "information" | "drip";
+type SidebarTab = "curriculum" | "information" | "drip" | "report";
 type VideoMode = "upload" | "url";
 
 /** Characters the editor stores HTML-escaped inside pasted links (a Vimeo embed URL arrives with &amp;). */
@@ -412,7 +413,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
   }
 
   const sidebarLink = (key: string) => {
-    if (key === "curriculum" || key === "information" || key === "drip") setActiveTab(key);
+    if (key === "curriculum" || key === "information" || key === "drip" || key === "report") setActiveTab(key);
     else toast("Coming soon");
   };
 
@@ -929,6 +930,8 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
               onSaved={fetchCourse}
             />
           )}
+          {activeTab === "report" && <CourseReportTab key={course.id} courseId={course.id} />}
+
           {activeTab === "drip" && (
             <CourseDripTab
               // Remount after a save so the saved values become the new starting point.
