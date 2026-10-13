@@ -8,8 +8,8 @@ import {
   ChevronDown,
   CreditCard,
   FileText,
-  LayoutDashboard,
   Menu,
+  Rocket,
   Receipt,
   Settings,
   Ticket,
@@ -39,7 +39,7 @@ interface Group {
 }
 
 const ITEMS: Item[] = [
-  { label: "Overview", href: "/creator", icon: LayoutDashboard, exact: true },
+  { label: "Get Started", href: "/creator/getstarted", icon: Rocket },
   { label: "Services", href: "/creator/services", icon: Briefcase },
   { label: "Workshops", href: "/creator/workshops", icon: Video },
   { label: "Coupons", href: "/creator/coupons", icon: Ticket },

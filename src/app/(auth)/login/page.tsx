@@ -4,11 +4,9 @@ import { useEffect, useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Mail } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import toast from "react-hot-toast";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
+import { AuthShell } from "@/components/auth/auth-shell";
 import { CodeInput, emptyCode } from "@/components/auth/code-input";
 
 /** Sign in with a code emailed to you. There is no password. */
@@ -28,6 +26,7 @@ export default function LoginPage() {
 
   async function sendCode(e?: React.FormEvent) {
     e?.preventDefault();
+    if (loading) return;
     setLoading(true);
     try {
       const res = await fetch("/api/auth/login-otp", {
@@ -71,77 +70,73 @@ export default function LoginPage() {
 
   if (step === "code") {
     return (
-      <Card>
-        <CardContent className="pt-8 pb-8">
-          <button
-            onClick={() => setStep("email")}
-            className="mb-4 flex items-center gap-1 rounded-md px-2 py-1 text-sm text-gray-500 transition-colors hover:bg-gray-50 hover:text-indigo-600"
-          >
-            <ArrowLeft className="h-4 w-4" /> Back
-          </button>
+      <AuthShell>
+        <button
+          onClick={() => setStep("email")}
+          className="mb-6 flex w-fit cursor-pointer items-center gap-2 text-lg text-gray-600 hover:text-black"
+        >
+          <ArrowLeft className="h-5 w-5" /> Back
+        </button>
+        <h1 className="text-[40px] font-semibold leading-tight text-black">Check your email</h1>
+        <p className="mt-3 text-xl text-gray-700">
+          We sent a 6-digit code to <strong className="font-semibold text-black">{email}</strong>
+        </p>
 
-          <div className="mb-8 text-center">
-            <div className="mb-4 inline-flex rounded-full bg-indigo-50 p-3">
-              <Mail className="h-6 w-6 text-indigo-600" />
-            </div>
-            <h1 className="text-2xl font-bold text-gray-900">Check your email</h1>
-            <p className="mt-1 text-sm text-gray-500">
-              We sent a 6-digit code to <strong>{email}</strong>
-            </p>
-          </div>
+        <div className="mt-8">
+          <CodeInput digits={digits} onChange={setDigits} onSubmit={verify} />
+        </div>
 
-          <div className="mb-6">
-            <CodeInput digits={digits} onChange={setDigits} onSubmit={verify} />
-          </div>
+        <button
+          onClick={verify}
+          disabled={loading}
+          className="mt-8 h-[56px] w-full cursor-pointer rounded-md bg-indigo-600 text-xl font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {loading ? "Signing in..." : "Login"}
+        </button>
 
-          <Button onClick={verify} className="w-full" loading={loading}>
-            Sign In
-          </Button>
-
-          <div className="mt-4 text-center">
-            {resendIn > 0 ? (
-              <p className="text-sm text-gray-400">Send a new code in {resendIn}s</p>
-            ) : (
-              <button onClick={() => sendCode()} className="text-sm font-medium text-indigo-600 hover:text-indigo-700">
-                Send a new code
-              </button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+        <p className="mt-5 text-center text-lg text-gray-600">
+          {resendIn > 0 ? (
+            `Send a new code in ${resendIn}s`
+          ) : (
+            <button onClick={() => sendCode()} className="cursor-pointer font-medium text-indigo-600 hover:underline">
+              Send a new code
+            </button>
+          )}
+        </p>
+      </AuthShell>
     );
   }
 
   return (
-    <Card>
-      <CardContent className="pt-8 pb-8">
-        <div className="mb-8 text-center">
-          <h1 className="text-2xl font-bold text-gray-900">Welcome back</h1>
-          <p className="mt-1 text-sm text-gray-500">We will email you a code to sign in</p>
-        </div>
+    <AuthShell>
+      <h1 className="text-[48px] font-semibold leading-[1.15] text-black">Welcome back!</h1>
+      <p className="mt-6 text-2xl text-black">Enter your email and we will send you a code to log in.</p>
 
-        <form onSubmit={sendCode} className="space-y-4">
-          <Input
-            id="email"
-            label="Email"
-            type="email"
-            placeholder="you@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-          <Button type="submit" className="w-full" loading={loading}>
-            Send code
-          </Button>
-        </form>
+      <form onSubmit={sendCode} className="mt-16 space-y-6">
+        <input
+          className="h-[62px] w-full rounded-md border border-gray-300 bg-white px-4 text-xl text-black placeholder:text-gray-600 focus:border-gray-500 focus:outline-none"
+          type="email"
+          placeholder="Enter email"
+          autoComplete="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
+        <button
+          type="submit"
+          disabled={!email.trim() || loading}
+          className="h-[56px] w-full cursor-pointer rounded-md bg-indigo-600 text-xl font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {loading ? "Sending code..." : "Send code"}
+        </button>
+      </form>
 
-        <p className="mt-6 text-center text-sm text-gray-500">
-          Don&apos;t have an account?{" "}
-          <Link href="/signup" className="font-medium text-indigo-600 hover:text-indigo-700">
-            Sign up
-          </Link>
-        </p>
-      </CardContent>
-    </Card>
+      <p className="mt-5 text-center text-lg text-black">
+        Don&rsquo;t have an account?{" "}
+        <Link href="/signup" className="font-medium text-[#1d86ff] hover:underline">
+          Sign up
+        </Link>
+      </p>
+    </AuthShell>
   );
 }

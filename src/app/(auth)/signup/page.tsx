@@ -4,19 +4,46 @@ import { useEffect, useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Mail } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import toast from "react-hot-toast";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
+import { AuthShell, type Step } from "@/components/auth/auth-shell";
 import { CodeInput, emptyCode } from "@/components/auth/code-input";
+import { COUNTRIES, PhoneInput, type Country } from "@/components/auth/phone-input";
 
-/** Creator sign-up: name and email, then the code we email. There is no password. */
+const TERMS_URL = process.env.NEXT_PUBLIC_TERMS_URL || "";
+const PRIVACY_URL = process.env.NEXT_PUBLIC_PRIVACY_URL || "";
+
+const STEPS: Step[] = [
+  { label: "Register", state: "active" },
+  { label: "About", state: "todo" },
+];
+
+const inputClass =
+  "h-[62px] w-full rounded-md border border-gray-300 bg-white px-4 text-xl text-black placeholder:text-gray-600 focus:border-gray-500 focus:outline-none";
+
+/** A policy name that links when the platform has set its address, and is plain text when it has not. */
+function Policy({ href, children }: { href: string; children: React.ReactNode }) {
+  return href ? (
+    <a href={href} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">
+      {children}
+    </a>
+  ) : (
+    <span className="text-indigo-600">{children}</span>
+  );
+}
+
+/**
+ * Creator sign-up, step 1 of 2: name, email and phone, then the code we email. There is no password.
+ * The "About" survey follows.
+ */
 export default function SignupPage() {
   const router = useRouter();
   const [step, setStep] = useState<"form" | "code">("form");
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState({ name: "", email: "" });
+  const [form, setForm] = useState({ name: "", email: "", phone: "" });
+  const [country, setCountry] = useState<Country>(COUNTRIES[0]);
+  const [terms, setTerms] = useState(false);
+  const [marketing, setMarketing] = useState(false);
   const [digits, setDigits] = useState(emptyCode());
   const [resendIn, setResendIn] = useState(0);
 
@@ -26,14 +53,17 @@ export default function SignupPage() {
     return () => clearTimeout(t);
   }, [resendIn]);
 
+  const ready = form.name.trim().length > 0 && form.email.trim().length > 0 && form.phone.length >= 6 && terms;
+
   async function sendCode(e?: React.FormEvent) {
     e?.preventDefault();
+    if (!ready || loading) return;
     setLoading(true);
     try {
       const res = await fetch("/api/auth/send-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ name: form.name, email: form.email }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) return void toast.error(data.error || "Something went wrong");
@@ -72,8 +102,19 @@ export default function SignupPage() {
         router.push("/login");
         return;
       }
+      // Attach the phone number and what they agreed to; the account exists either way.
+      await fetch("/api/account/signup-details", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phone: form.phone,
+          countryCode: country.dial,
+          termsAccepted: terms,
+          marketingOptIn: marketing,
+        }),
+      }).catch(() => {});
       toast.success("Welcome!");
-      router.push("/creator");
+      router.push("/signup/about");
     } catch {
       toast.error("Something went wrong");
     } finally {
@@ -83,85 +124,107 @@ export default function SignupPage() {
 
   if (step === "code") {
     return (
-      <Card>
-        <CardContent className="pt-8 pb-8">
-          <button
-            onClick={() => setStep("form")}
-            className="mb-4 flex items-center gap-1 rounded-md px-2 py-1 text-sm text-gray-500 transition-colors hover:bg-gray-50 hover:text-indigo-600"
-          >
-            <ArrowLeft className="h-4 w-4" /> Back
-          </button>
+      <AuthShell steps={STEPS}>
+        <button
+          onClick={() => setStep("form")}
+          className="mb-6 flex w-fit cursor-pointer items-center gap-2 text-lg text-gray-600 hover:text-black"
+        >
+          <ArrowLeft className="h-5 w-5" /> Back
+        </button>
+        <h1 className="text-[40px] font-semibold leading-tight text-black">Check your email</h1>
+        <p className="mt-3 text-xl text-gray-700">
+          We sent a 6-digit code to <strong className="font-semibold text-black">{form.email}</strong>
+        </p>
 
-          <div className="mb-8 text-center">
-            <div className="mb-4 inline-flex rounded-full bg-indigo-50 p-3">
-              <Mail className="h-6 w-6 text-indigo-600" />
-            </div>
-            <h1 className="text-2xl font-bold text-gray-900">Check your email</h1>
-            <p className="mt-1 text-sm text-gray-500">
-              We sent a 6-digit code to <strong>{form.email}</strong>
-            </p>
-          </div>
+        <div className="mt-8">
+          <CodeInput digits={digits} onChange={setDigits} onSubmit={verify} />
+        </div>
 
-          <div className="mb-6">
-            <CodeInput digits={digits} onChange={setDigits} onSubmit={verify} />
-          </div>
+        <button
+          onClick={verify}
+          disabled={loading}
+          className="mt-8 h-[56px] w-full cursor-pointer rounded-md bg-indigo-600 text-xl font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {loading ? "Verifying..." : "Verify & create account"}
+        </button>
 
-          <Button onClick={verify} className="w-full" loading={loading}>
-            Verify & Create Account
-          </Button>
-
-          <div className="mt-4 text-center">
-            {resendIn > 0 ? (
-              <p className="text-sm text-gray-400">Send a new code in {resendIn}s</p>
-            ) : (
-              <button onClick={() => sendCode()} className="text-sm font-medium text-indigo-600 hover:text-indigo-700">
-                Send a new code
-              </button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+        <p className="mt-5 text-center text-lg text-gray-600">
+          {resendIn > 0 ? (
+            `Send a new code in ${resendIn}s`
+          ) : (
+            <button onClick={() => sendCode()} className="cursor-pointer font-medium text-indigo-600 hover:underline">
+              Send a new code
+            </button>
+          )}
+        </p>
+      </AuthShell>
     );
   }
 
   return (
-    <Card>
-      <CardContent className="pt-8 pb-8">
-        <div className="mb-8 text-center">
-          <h1 className="text-2xl font-bold text-gray-900">Create your account</h1>
-          <p className="mt-1 text-sm text-gray-500">Start your journey today</p>
+    <AuthShell steps={STEPS}>
+      <h1 className="text-[48px] font-semibold leading-[1.15] text-black">Welcome! First things first...</h1>
+      <p className="mt-6 text-2xl text-black">You can always change them later.</p>
+
+      <form onSubmit={sendCode} className="mt-16 space-y-6">
+        <input
+          className={inputClass}
+          placeholder="Enter name"
+          autoComplete="name"
+          value={form.name}
+          onChange={(e) => setForm({ ...form, name: e.target.value })}
+        />
+        <input
+          className={inputClass}
+          type="email"
+          placeholder="Enter email"
+          autoComplete="email"
+          value={form.email}
+          onChange={(e) => setForm({ ...form, email: e.target.value })}
+        />
+        <PhoneInput country={country} onCountry={setCountry} value={form.phone} onChange={(phone) => setForm({ ...form, phone })} />
+
+        <div className="space-y-2 text-lg leading-6 text-gray-800">
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={terms}
+              onChange={(e) => setTerms(e.target.checked)}
+              className="mt-1 h-5 w-5 shrink-0 cursor-pointer rounded accent-indigo-600"
+            />
+            <span>
+              I have read and agree to the <Policy href={TERMS_URL}>Terms of Service</Policy> and <Policy href={PRIVACY_URL}>Privacy Policy</Policy>.
+            </span>
+          </label>
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={marketing}
+              onChange={(e) => setMarketing(e.target.checked)}
+              className="mt-1 h-5 w-5 shrink-0 cursor-pointer rounded accent-indigo-600"
+            />
+            <span>
+              I agree to receive product updates, newsletters, and promotional communications by email. I understand I can unsubscribe at
+              any time.
+            </span>
+          </label>
         </div>
 
-        <form onSubmit={sendCode} className="space-y-4">
-          <Input
-            id="name"
-            label="Full Name"
-            placeholder="John Doe"
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            required
-          />
-          <Input
-            id="email"
-            label="Email"
-            type="email"
-            placeholder="you@example.com"
-            value={form.email}
-            onChange={(e) => setForm({ ...form, email: e.target.value })}
-            required
-          />
-          <Button type="submit" className="w-full" loading={loading}>
-            Continue
-          </Button>
-        </form>
+        <button
+          type="submit"
+          disabled={!ready || loading}
+          className="h-[56px] w-full cursor-pointer rounded-md bg-indigo-600 text-xl font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {loading ? "Sending code..." : "Get started"}
+        </button>
+      </form>
 
-        <p className="mt-6 text-center text-sm text-gray-500">
-          Already have an account?{" "}
-          <Link href="/login" className="font-medium text-indigo-600 hover:text-indigo-700">
-            Sign in
-          </Link>
-        </p>
-      </CardContent>
-    </Card>
+      <p className="mt-5 text-center text-lg text-black">
+        Already have an account?{" "}
+        <Link href="/login" className="font-medium text-[#1d86ff] hover:underline">
+          Login
+        </Link>
+      </p>
+    </AuthShell>
   );
 }
