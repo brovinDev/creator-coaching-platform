@@ -452,14 +452,14 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
         <div className="flex items-center gap-3">
         <button
           onClick={() => router.push(`/preview/courses/${courseId}`)}
-          className="h-12 cursor-pointer rounded-md bg-indigo-600 px-7 text-base font-semibold text-white hover:bg-indigo-700"
+          className="h-[52px] cursor-pointer rounded-md bg-indigo-600 px-[29px] text-lg font-semibold text-white hover:bg-indigo-700"
         >
           Preview changes
         </button>
         {!course.published && (
           <button
             onClick={togglePublish}
-            className="h-12 cursor-pointer rounded-md bg-indigo-600 px-7 text-base font-semibold text-white hover:bg-indigo-700"
+            className="h-12 cursor-pointer rounded-md bg-indigo-600 px-[29px] text-lg font-semibold text-white hover:bg-indigo-700"
           >
             Publish
           </button>
@@ -480,14 +480,14 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
                   <button
                     onClick={() => sidebarLink(item.key)}
                     className={`flex h-[75px] w-full cursor-pointer items-center justify-between rounded-lg px-4 text-left transition-colors ${
-                      active ? "bg-gray-300" : "hover:bg-gray-100"
+                      active ? "bg-indigo-50" : "hover:bg-gray-100"
                     }`}
                   >
                     <span className="flex items-center gap-4">
                       <span className={`flex h-[46px] w-[46px] items-center justify-center rounded-full ${active ? "bg-indigo-600 text-white" : "bg-gray-200 text-gray-800"}`}>
                         <Icon className="h-5 w-5" />
                       </span>
-                      <span className="text-base font-semibold text-black">{item.label}</span>
+                      <span className="text-lg font-semibold text-black">{item.label}</span>
                     </span>
                     <ChevronRight className="h-5 w-5 text-gray-700" />
                   </button>
@@ -502,7 +502,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
           {activeTab === "curriculum" && (
             <div className="rounded-xl border border-gray-200 bg-white">
               <div className="flex items-center justify-between border-b border-gray-200 px-6 py-5">
-                <h2 className="text-2xl font-semibold text-black">Create your content</h2>
+                <h2 className="text-[25px] font-semibold text-black">Create your content</h2>
               </div>
 
               <div className="space-y-5 p-4">
@@ -526,7 +526,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
                         <button
                           onClick={() => { setEditingSectionId(mod.id); setEditingSectionTitle(mod.title); }}
                           title="Rename section"
-                          className="-ml-px h-10 max-w-[70%] cursor-pointer truncate bg-indigo-600 pl-3.5 pr-9 text-left text-base font-semibold leading-10 text-white"
+                          className="-ml-px h-10 max-w-[70%] cursor-pointer truncate bg-indigo-600 pl-3.5 pr-9 text-left text-lg font-semibold leading-10 text-white"
                           style={{ clipPath: "polygon(0 0, calc(100% - 20px) 0, 100% 50%, calc(100% - 20px) 100%, 0 100%)" }}
                         >
                           {mod.title}
@@ -599,7 +599,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
                               {isEditingTitle && editingChapter ? (
                                 <div className="px-4 py-4">
                                   <div className="flex items-center gap-3">
-                                    <span className="shrink-0 text-lg font-semibold text-black">Chapter {lessonIdx + 1}:</span>
+                                    <span className="shrink-0 text-xl font-semibold text-black">Chapter {lessonIdx + 1}:</span>
                                     <input
                                       autoFocus
                                       value={editingChapter.title}
@@ -633,13 +633,13 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
                                 >
                                   <div className="flex min-w-0 items-center gap-3">
                                     <Caret open={isExpanded} />
-                                    <span className="shrink-0 text-lg font-semibold text-black">Chapter {lessonIdx + 1}:</span>
+                                    <span className="shrink-0 text-xl font-semibold text-black">Chapter {lessonIdx + 1}:</span>
                                     {lesson.videoUrl ? (
                                       isFileUrl(lesson.videoUrl) ? <MdPlayCircle className="h-6 w-6 shrink-0 text-[#4a4a5a]" /> : <MdLink className="h-5 w-5 shrink-0 text-gray-800" />
                                     ) : (
                                       <MdInsertDriveFile className="h-5 w-5 shrink-0 text-gray-800" />
                                     )}
-                                    <span className="truncate text-base text-gray-900">{lesson.title}</span>
+                                    <span className="truncate text-lg text-black">{lesson.title}</span>
                                     {lesson.isFree && (
                                       <span className="shrink-0 rounded bg-green-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-green-700">Free</span>
                                     )}
@@ -698,7 +698,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
 
                               {/* Expanded chapter content */}
                               {isExpanded && !isEditingTitle && (
-                                <div className="space-y-5 px-6 pb-8 pt-6">
+                                <div className="space-y-5 px-6 pb-[60px] pt-6">
                                   {/* Main content: picker until something is chosen */}
                                   {!lesson.videoUrl && !pickerClosed.has(lesson.id) && (
                                     <div className="relative py-2 text-center">
@@ -709,10 +709,10 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
                                       >
                                         <X className="h-4 w-4" />
                                       </button>
-                                      <p className="text-base text-gray-900">
+                                      <p className="text-base text-black">
                                         Select the main type of content. Files and links can be added as resources.
                                       </p>
-                                      <div className="mt-6 flex items-center justify-center gap-5">
+                                      <div className="mt-6 flex items-center justify-center gap-[38px]">
                                         <FileTile color="#e0486e" title="Upload video" onClick={() => setShowVideoModal({ moduleId: mod.id, lessonId: lesson.id, mode: "upload" })}>
                                           <MdPlayCircle className="h-6 w-6 text-white" />
                                         </FileTile>
@@ -757,7 +757,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
                                         )}
                                       </div>
                                       <div className="min-w-0 flex-1">
-                                        <p className="truncate text-lg font-semibold text-black">{lesson.videoName || fileNameFrom(lesson.videoUrl)}</p>
+                                        <p className="truncate text-lg font-medium text-black">{lesson.videoName || fileNameFrom(lesson.videoUrl)}</p>
                                         <p className="mt-0.5 text-sm text-gray-600">
                                           {(lesson.videoName || fileNameFrom(lesson.videoUrl)).split(".").pop()?.toUpperCase() || "VIDEO"}
                                           {lesson.videoSize && Number(lesson.videoSize) > 0 ? ` \u2022 ${formatSize(Number(lesson.videoSize))}` : ""}
@@ -851,11 +851,11 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
                                     </div>
                                   )}
 
-                                  <div className="flex flex-wrap items-center gap-4">
+                                  <div className="mt-10 flex flex-wrap items-center gap-[10px]">
                                     {!hasDescription && !isEditingDesc && (
                                       <button
                                         onClick={() => setEditingDescription({ moduleId: mod.id, lessonId: lesson.id, content: "" })}
-                                        className="flex h-[45px] cursor-pointer items-center gap-2 rounded-md bg-gray-200 px-5 text-base font-semibold text-black hover:bg-gray-300"
+                                        className="flex h-[45px] cursor-pointer items-center gap-2 rounded-md bg-gray-200 px-5 text-lg font-semibold text-black hover:bg-gray-300"
                                       >
                                         <Plus className="h-4 w-4" /> Add description
                                       </button>
@@ -865,7 +865,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
                                         resourceTargetRef.current = { moduleId: mod.id, lessonId: lesson.id };
                                         resourceInputRef.current?.click();
                                       }}
-                                      className="flex h-[45px] cursor-pointer items-center gap-2 rounded-md bg-indigo-600 px-5 text-base font-semibold text-white hover:bg-indigo-700"
+                                      className="flex h-[45px] cursor-pointer items-center gap-2 rounded-md bg-indigo-600 px-5 text-lg font-semibold text-white hover:bg-indigo-700"
                                     >
                                       {uploadingResource === lesson.id ? (
                                         <><Loader2 className="h-4 w-4 animate-spin" /> Uploading...</>
@@ -896,7 +896,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
                         <div className="rounded-lg bg-gray-100 px-4 py-4">
                           <div className="flex items-center gap-3">
                             <Caret open={false} />
-                            <span className="shrink-0 text-lg font-semibold text-black">Chapter {mod.lessons.length + 1}</span>
+                            <span className="shrink-0 text-xl font-semibold text-black">Chapter {mod.lessons.length + 1}</span>
                             <input
                               autoFocus
                               value={addingChapter.title}
@@ -927,7 +927,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
                       ) : (
                         <button
                           onClick={() => setAddingChapter({ moduleId: mod.id, title: "", isFree: false })}
-                          className="flex cursor-pointer items-center gap-2 py-1 text-base text-indigo-600 hover:underline"
+                          className="flex cursor-pointer items-center gap-2 py-1 text-lg text-indigo-600 hover:underline"
                         >
                           <Plus className="h-4 w-4" /> Add more chapters
                         </button>
