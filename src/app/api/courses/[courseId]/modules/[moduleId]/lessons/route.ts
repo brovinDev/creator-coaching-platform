@@ -15,7 +15,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   const course = await nocodeDb.courses.findUnique({ id: courseId, creator_id: session.user.id }, token);
   if (!course) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const { title, content, videoUrl, thumbnail } = await req.json();
+  const { title, content, videoUrl, thumbnail, isFree } = await req.json();
   if (!title) return NextResponse.json({ error: "Title is required" }, { status: 400 });
 
   const existing = await nocodeDb.lessons.findMany(
@@ -32,6 +32,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       thumbnail: thumbnail || null,
       module_id: moduleId,
       position: maxPos + 1,
+      is_free: isFree ? "true" : "false",
     },
     token
   );
@@ -44,5 +45,6 @@ export async function POST(req: NextRequest, { params }: Params) {
     thumbnail: lesson.thumbnail,
     position: lesson.position,
     moduleId: lesson.module_id,
+    isFree: isFree === true,
   });
 }

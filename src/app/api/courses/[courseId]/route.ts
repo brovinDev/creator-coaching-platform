@@ -12,6 +12,7 @@ function mapLesson(l: Record<string, unknown>) {
     position: l.position,
     moduleId: l.module_id,
     resources: l.resources || null,
+    isFree: l.is_free === true || l.is_free === "true",
   };
 }
 

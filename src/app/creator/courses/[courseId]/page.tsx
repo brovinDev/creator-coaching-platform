@@ -11,29 +11,33 @@ import {
   ArrowLeft,
   Plus,
   ChevronRight,
-  ChevronDown,
-  BookOpen,
-  Info,
-  BarChart3,
-  HelpCircle,
-  ClipboardList,
-  FileCheck,
-  Star,
-  PlayCircle,
-  FileText,
-  Image as ImageIcon,
-  Headphones,
-  Link as LinkIcon,
-  File,
   Pencil,
   Trash2,
   X,
-  Video,
   Upload,
-  Paperclip,
   Loader2,
   GripVertical,
+  Info as InfoIcon,
 } from "lucide-react";
+import {
+  MdAddBox,
+  MdArticle,
+  MdTimer,
+  MdInsertChart,
+  MdChat,
+  MdHelp,
+  MdAssignment,
+  MdFactCheck,
+  MdSmartToy,
+  MdPlayArrow,
+  MdHeadset,
+  MdImage,
+  MdQuestionAnswer,
+  MdLink,
+  MdEditNote,
+  MdInsertDriveFile,
+  MdPlayCircle,
+} from "react-icons/md";
 import toast from "react-hot-toast";
 import { RichTextEditor } from "@/components/rich-text-editor";
 
@@ -51,6 +55,7 @@ interface Lesson {
   thumbnail: string | null;
   position: number;
   resources: string | null;
+  isFree?: boolean;
 }
 
 interface Module {
@@ -72,6 +77,97 @@ interface Course {
 }
 
 type SidebarTab = "curriculum" | "information";
+type VideoMode = "upload" | "url";
+
+/** Characters the editor stores HTML-escaped inside pasted links (a Vimeo embed URL arrives with &amp;). */
+const decodeUrl = (url: string) => url.replace(/&amp;/g, "&");
+const isFileUrl = (url: string) => /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(url) || /res\.cloudinary\.com/.test(url);
+
+const SIDEBAR: { key: string; label: string; icon: React.ComponentType<{ className?: string }>; group: 1 | 2 }[] = [
+  { key: "curriculum", label: "Curriculum", icon: MdAddBox, group: 1 },
+  { key: "information", label: "Information", icon: MdArticle, group: 1 },
+  { key: "drip", label: "Drip", icon: MdTimer, group: 1 },
+  { key: "report", label: "Report", icon: MdInsertChart, group: 2 },
+  { key: "comments", label: "Comments", icon: MdChat, group: 2 },
+  { key: "qna", label: "QnA", icon: MdHelp, group: 2 },
+  { key: "assignments", label: "Assignment Responses", icon: MdAssignment, group: 2 },
+  { key: "reviews", label: "Reviews", icon: MdFactCheck, group: 2 },
+  { key: "chatbot", label: "QnA Chatbot", icon: MdSmartToy, group: 2 },
+];
+
+/** The dark pill with an arrow that shows under a content-type icon on hover or focus. */
+function Tip({ text }: { text: string }) {
+  return (
+    <span className="pointer-events-none absolute left-1/2 top-full z-30 mt-2.5 hidden -translate-x-1/2 whitespace-nowrap rounded-lg bg-[#222] px-4 py-3 text-sm font-medium text-white group-hover:block group-focus-visible:block">
+      <span className="absolute -top-1 left-1/2 h-2.5 w-2.5 -translate-x-1/2 rotate-45 bg-[#222]" />
+      <span className="relative">{text}</span>
+    </span>
+  );
+}
+
+/** A document tile with a folded corner, as the content-type picker shows; the glyph sits on top. */
+function FileTile({
+  color,
+  children,
+  onClick,
+  title,
+  outlined,
+}: {
+  color: string;
+  children: React.ReactNode;
+  onClick: () => void;
+  title: string;
+  outlined?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={title}
+      onClick={onClick}
+      className="group relative h-14 w-11 shrink-0 cursor-pointer"
+    >
+      <svg viewBox="0 0 44 56" className="absolute inset-0 h-full w-full" aria-hidden>
+        <path
+          d="M6 .5h24.5L43.5 14v36a5.5 5.5 0 0 1-5.5 5.5H6A5.5 5.5 0 0 1 .5 50V6A5.5 5.5 0 0 1 6 .5Z"
+          fill={color}
+          stroke={outlined ? "#e5e7eb" : "none"}
+        />
+        <path d="M30.5.5V8a6 6 0 0 0 6 6h7Z" fill={outlined ? "#f3f4f6" : "#fff"} fillOpacity={outlined ? 1 : 0.38} />
+      </svg>
+      <span className="absolute inset-0 flex items-center justify-center pt-2">{children}</span>
+      <Tip text={title} />
+    </button>
+  );
+}
+
+/** The solid triangle beside a chapter: points right when closed, down when open. */
+function Caret({ open }: { open: boolean }) {
+  return (
+    <span
+      className={`inline-block h-0 w-0 shrink-0 border-y-[6px] border-l-[9px] border-y-transparent border-l-black transition-transform ${open ? "rotate-90" : ""}`}
+    />
+  );
+}
+
+function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      onClick={() => onChange(!on)}
+      className={`relative h-6 w-[52px] shrink-0 cursor-pointer rounded-full border-2 transition-colors ${
+        on ? "border-indigo-600 bg-indigo-600" : "border-gray-400 bg-gray-100"
+      }`}
+    >
+      <span
+        className={`absolute top-1/2 h-4 w-4 -translate-y-1/2 rounded-full transition-all ${
+          on ? "left-[30px] bg-white" : "left-[3px] bg-gray-400"
+        }`}
+      />
+    </button>
+  );
+}
 
 export default function CourseDetailPage({ params }: { params: Promise<{ courseId: string }> }) {
   const { courseId } = use(params);
@@ -81,20 +177,22 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<SidebarTab>("curriculum");
   const [form, setForm] = useState({ title: "", description: "", thumbnail: "" });
+  const [logoUrl, setLogoUrl] = useState("");
 
   // Section (module) state
   const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
   const [editingSectionTitle, setEditingSectionTitle] = useState("");
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+  const [sectionMenu, setSectionMenu] = useState<string | null>(null);
 
   // Chapter (lesson) state
   const [expandedChapters, setExpandedChapters] = useState<Set<string>>(new Set());
-  const [showContentPicker, setShowContentPicker] = useState<string | null>(null);
-  const [showAddChapter, setShowAddChapter] = useState<string | null>(null);
-  const [newChapterTitle, setNewChapterTitle] = useState("");
+  const [pickerClosed, setPickerClosed] = useState<Set<string>>(new Set());
+  const [editingChapter, setEditingChapter] = useState<{ moduleId: string; lessonId: string; title: string; isFree: boolean } | null>(null);
+  const [addingChapter, setAddingChapter] = useState<{ moduleId: string; title: string; isFree: boolean } | null>(null);
+  const [savingChapter, setSavingChapter] = useState(false);
 
   // Upload/edit state
-  const [showVideoModal, setShowVideoModal] = useState<{ moduleId: string; lessonId: string } | null>(null);
+  const [showVideoModal, setShowVideoModal] = useState<{ moduleId: string; lessonId: string; mode: VideoMode } | null>(null);
   const [editingDescription, setEditingDescription] = useState<{ moduleId: string; lessonId: string; content: string } | null>(null);
 
   // Resource upload state
@@ -109,13 +207,19 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
 
   useEffect(() => { fetchCourse(); }, [courseId]);
 
+  useEffect(() => {
+    fetch("/api/branding")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((b) => { if (b?.logoUrl) setLogoUrl(b.logoUrl); })
+      .catch(() => {});
+  }, []);
+
   async function fetchCourse() {
     const res = await fetch(`/api/courses/${courseId}`);
     if (!res.ok) { router.push("/creator/courses"); return; }
     const data = await res.json();
     setCourse(data);
     setForm({ title: data.title, description: data.description || "", thumbnail: data.thumbnail || "" });
-    setExpandedSections(new Set(data.modules.map((m: Module) => m.id)));
     setLoading(false);
   }
 
@@ -167,6 +271,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
   }
 
   async function deleteSection(moduleId: string) {
+    setSectionMenu(null);
     if (!confirm("Delete this section and all its chapters?")) return;
     await fetch(`/api/courses/${courseId}/modules/${moduleId}`, { method: "DELETE" });
     toast.success("Section deleted");
@@ -174,16 +279,40 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
   }
 
   // Chapter CRUD
-  async function addChapter(moduleId: string) {
-    if (!newChapterTitle.trim()) return;
-    await fetch(`/api/courses/${courseId}/modules/${moduleId}/lessons`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: newChapterTitle }),
-    });
-    setNewChapterTitle("");
-    setShowAddChapter(null);
-    fetchCourse();
+  async function addChapter() {
+    if (!addingChapter || !addingChapter.title.trim() || savingChapter) return;
+    setSavingChapter(true);
+    try {
+      const res = await fetch(`/api/courses/${courseId}/modules/${addingChapter.moduleId}/lessons`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: addingChapter.title.trim(), isFree: addingChapter.isFree }),
+      });
+      if (!res.ok) throw new Error();
+      const lesson = await res.json();
+      setAddingChapter(null);
+      // Open the new chapter so the content picker is right there.
+      setExpandedChapters((prev) => new Set(prev).add(String(lesson.id)));
+      await fetchCourse();
+    } catch {
+      toast.error("Could not add the chapter");
+    } finally {
+      setSavingChapter(false);
+    }
+  }
+
+  async function saveChapterEdit() {
+    if (!editingChapter || !editingChapter.title.trim() || savingChapter) return;
+    setSavingChapter(true);
+    try {
+      await updateChapter(editingChapter.moduleId, editingChapter.lessonId, {
+        title: editingChapter.title.trim(),
+        isFree: editingChapter.isFree,
+      });
+      setEditingChapter(null);
+    } finally {
+      setSavingChapter(false);
+    }
   }
 
   async function deleteChapter(moduleId: string, lessonId: string) {
@@ -199,7 +328,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
-    fetchCourse();
+    await fetchCourse();
   }
 
   async function saveDescription() {
@@ -268,9 +397,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
 
     setCourse({
       ...course,
-      modules: course.modules.map((m) =>
-        m.id === moduleId ? { ...m, lessons } : m
-      ),
+      modules: course.modules.map((m) => (m.id === moduleId ? { ...m, lessons } : m)),
     });
 
     await Promise.all(
@@ -284,14 +411,6 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
     );
   }
 
-  function toggleSection(id: string) {
-    setExpandedSections((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  }
-
   function toggleChapter(id: string) {
     setExpandedChapters((prev) => {
       const next = new Set(prev);
@@ -300,500 +419,526 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
     });
   }
 
-  function getContentIcon(lesson: Lesson) {
-    if (lesson.videoUrl) return <PlayCircle className="h-4 w-4 text-red-500" />;
-    return <FileText className="h-4 w-4 text-blue-500" />;
-  }
-
   if (loading || !course) {
-    return <div className="flex items-center justify-center py-20 text-gray-400">Loading...</div>;
+    return <div className="fixed inset-0 z-40 flex items-center justify-center bg-white text-gray-400">Loading...</div>;
   }
 
-  const sidebarItems: { key: SidebarTab | string; label: string; icon: React.ReactNode; badge?: string }[] = [
-    { key: "curriculum", label: "Curriculum", icon: <PlayCircle className="h-4 w-4" /> },
-    { key: "information", label: "Information", icon: <Info className="h-4 w-4" /> },
-    { key: "report", label: "Report", icon: <BarChart3 className="h-4 w-4" /> },
-    { key: "qna", label: "QnA", icon: <HelpCircle className="h-4 w-4" /> },
-    { key: "analytics", label: "Assignment Analytics", icon: <ClipboardList className="h-4 w-4" /> },
-    { key: "submissions", label: "Submissions", icon: <FileCheck className="h-4 w-4" /> },
-    { key: "reviews", label: "Course Reviews", icon: <Star className="h-4 w-4" /> },
-  ];
+  const sidebarLink = (key: string) => {
+    if (key === "curriculum" || key === "information") setActiveTab(key);
+    else toast("Coming soon");
+  };
 
   return (
-    <div className="-m-6 lg:-m-8">
+    <div className="fixed inset-0 z-40 flex flex-col bg-white font-sans" style={{ zoom: 0.8, fontFamily: "var(--font-poppins), sans-serif" }}>
       {/* Top bar */}
-      <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 bg-white">
-        <div className="flex items-center gap-3">
+      <div className="flex h-[76px] shrink-0 items-center justify-between border-b border-gray-200 bg-white px-5">
+        <div className="flex items-center gap-4">
           <button
             onClick={() => router.push("/creator/courses")}
-            className="p-1.5 rounded-full hover:bg-gray-100 transition-colors cursor-pointer"
+            aria-label="Back to courses"
+            className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full bg-gray-300 hover:bg-gray-400"
           >
-            <ArrowLeft className="h-5 w-5 text-gray-600" />
+            <ArrowLeft className="h-6 w-6 text-black" />
           </button>
-          <h1 className="text-base font-semibold text-gray-900 truncate max-w-md">{course.title}</h1>
+          {logoUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={logoUrl} alt="" className="h-14 w-14 rounded object-cover" />
+          )}
+          <span className="hidden h-8 w-px bg-gray-200 sm:block" />
+          <h1 className="max-w-[520px] truncate text-lg font-semibold text-gray-900">{course.title}</h1>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => router.push(`/preview/courses/${courseId}`)}
-            className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
-          >
-            Preview Changes
-          </button>
+        <div className="flex items-center gap-3">
+        <button
+          onClick={() => router.push(`/preview/courses/${courseId}`)}
+          className="h-12 cursor-pointer rounded-md bg-indigo-600 px-7 text-base font-semibold text-white hover:bg-indigo-700"
+        >
+          Preview changes
+        </button>
+        {!course.published && (
           <button
             onClick={togglePublish}
-            className={`px-5 py-2 text-sm font-medium text-white rounded-lg transition-colors cursor-pointer ${
-              course.published
-                ? "bg-red-500 hover:bg-red-600"
-                : "bg-red-500 hover:bg-red-600"
-            }`}
+            className="h-12 cursor-pointer rounded-md bg-indigo-600 px-7 text-base font-semibold text-white hover:bg-indigo-700"
           >
-            {course.published ? "Unpublish" : "Publish"}
+            Publish
           </button>
+        )}
         </div>
       </div>
 
-      <div className="flex min-h-[calc(100vh-140px)]">
+      <div className="flex min-h-0 flex-1">
         {/* Sidebar */}
-        <div className="w-60 border-r border-gray-100 bg-white shrink-0">
-          <nav className="py-1">
-            {sidebarItems.map((item) => {
-              const isActive = item.key === activeTab;
-              const isClickable = item.key === "curriculum" || item.key === "information";
+        <aside className="hidden w-[450px] shrink-0 overflow-y-auto border-r border-gray-200 bg-white px-4 pt-4 md:block">
+          <nav>
+            {SIDEBAR.map((item, i) => {
+              const active = item.key === activeTab;
+              const Icon = item.icon;
               return (
-                <button
-                  key={item.key}
-                  onClick={() => {
-                    if (isClickable) setActiveTab(item.key as SidebarTab);
-                    else toast("Coming soon");
-                  }}
-                  className={`w-full flex items-center justify-between px-4 py-3 text-sm transition-colors cursor-pointer ${
-                    isActive
-                      ? "text-gray-900 font-medium bg-blue-50/50"
-                      : "text-gray-600 hover:bg-gray-50"
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className={isActive ? "text-red-500" : "text-gray-400"}>{item.icon}</span>
-                    <span>{item.label}</span>
-                    {item.badge && (
-                      <span className="text-[10px] font-bold bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded">
-                        {item.badge}
+                <div key={item.key}>
+                  {item.group === 2 && SIDEBAR[i - 1]?.group === 1 && <div className="my-3 border-t border-gray-200" />}
+                  <button
+                    onClick={() => sidebarLink(item.key)}
+                    className={`flex h-[75px] w-full cursor-pointer items-center justify-between rounded-lg px-4 text-left transition-colors ${
+                      active ? "bg-gray-300" : "hover:bg-gray-100"
+                    }`}
+                  >
+                    <span className="flex items-center gap-4">
+                      <span className={`flex h-[46px] w-[46px] items-center justify-center rounded-full ${active ? "bg-indigo-600 text-white" : "bg-gray-200 text-gray-800"}`}>
+                        <Icon className="h-5 w-5" />
                       </span>
-                    )}
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-gray-300" />
-                </button>
+                      <span className="text-base font-semibold text-black">{item.label}</span>
+                    </span>
+                    <ChevronRight className="h-5 w-5 text-gray-700" />
+                  </button>
+                </div>
               );
             })}
           </nav>
-        </div>
+        </aside>
 
         {/* Main content */}
-        <div className="flex-1 p-6 lg:p-8 bg-gray-50/50 overflow-y-auto">
+        <main className="min-w-0 flex-1 overflow-y-auto bg-gray-50 p-5">
           {activeTab === "curriculum" && (
-            <div className="max-w-4xl">
-              <h2 className="text-xl font-bold text-gray-900 mb-5">Create your content</h2>
+            <div className="rounded-xl border border-gray-200 bg-white">
+              <div className="flex items-center justify-between border-b border-gray-200 px-6 py-5">
+                <h2 className="text-2xl font-semibold text-black">Create your content</h2>
+              </div>
 
-              {/* Sections */}
-              {course.modules.map((mod, modIdx) => (
-                <div
-                  key={mod.id}
-                  className="mb-4 border border-dashed border-gray-300 rounded-xl bg-blue-50/20 overflow-visible"
-                >
-                  {/* Section header */}
-                  <div className="flex items-center gap-3 px-4 py-3">
-                    <span className="shrink-0 text-xs font-bold text-white bg-gray-900 pl-2.5 pr-3 py-1 rounded-r-full rounded-l-sm flex items-center gap-0.5">
-                      Section {modIdx + 1}
-                      <ChevronRight className="h-3 w-3" />
-                    </span>
-                    {editingSectionId === mod.id ? (
-                      <div className="flex items-center gap-2 flex-1">
-                        <input
-                          autoFocus
-                          value={editingSectionTitle}
-                          onChange={(e) => setEditingSectionTitle(e.target.value)}
-                          onKeyDown={(e) => { if (e.key === "Enter") saveSectionTitle(mod.id); if (e.key === "Escape") setEditingSectionId(null); }}
-                          className="flex-1 text-sm bg-white border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400"
-                        />
-                        <button onClick={() => setEditingSectionId(null)} className="text-xs text-gray-500 hover:text-gray-700 cursor-pointer">Cancel</button>
-                        <button onClick={() => saveSectionTitle(mod.id)} className="text-xs text-white bg-gray-900 px-3 py-1 rounded cursor-pointer">Save</button>
-                      </div>
-                    ) : (
-                      <span
-                        className="text-sm text-gray-700 cursor-pointer hover:text-gray-900 flex-1"
-                        onClick={() => { setEditingSectionId(mod.id); setEditingSectionTitle(mod.title); }}
-                      >
-                        {mod.title}
-                      </span>
-                    )}
-                    <button
-                      onClick={() => deleteSection(mod.id)}
-                      className="p-1 text-gray-300 hover:text-red-500 cursor-pointer"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-
-                  {/* Chapters */}
-                  <div className="px-4 pb-4">
-                    {mod.lessons.map((lesson, lessonIdx) => {
-                      const isExpanded = expandedChapters.has(lesson.id);
-                      const isEditingDesc = editingDescription?.lessonId === lesson.id;
-                      const isDragOver = dragOverTarget?.moduleId === mod.id && dragOverTarget?.lessonIdx === lessonIdx;
-                      const isDragging = draggingLesson === lesson.id;
-                      const dragFromAbove = dragItemRef.current && dragItemRef.current.moduleId === mod.id && dragItemRef.current.lessonIdx < lessonIdx;
-                      return (
-                        <div
-                          key={lesson.id}
-                          data-chapter
-                          className="transition-transform duration-200 ease-in-out"
-                          style={{
-                            marginBottom: 8,
-                            transform: isDragOver ? (dragFromAbove ? "translateY(4px)" : "translateY(-4px)") : "translateY(0)",
-                          }}
-                          onDragOver={(e) => {
-                            e.preventDefault();
-                            e.dataTransfer.dropEffect = "move";
-                            if (dragItemRef.current?.moduleId === mod.id && dragItemRef.current.lessonIdx !== lessonIdx) {
-                              setDragOverTarget({ moduleId: mod.id, lessonIdx });
-                            }
-                          }}
-                          onDragLeave={() => {
-                            if (dragOverTarget?.lessonIdx === lessonIdx) setDragOverTarget(null);
-                          }}
-                          onDrop={(e) => {
-                            e.preventDefault();
-                            if (dragItemRef.current?.moduleId === mod.id) {
-                              reorderChapters(mod.id, dragItemRef.current.lessonIdx, lessonIdx);
-                            }
-                            dragItemRef.current = null;
-                            setDragOverTarget(null);
-                            setDraggingLesson(null);
-                          }}
+              <div className="space-y-5 p-4">
+                {course.modules.map((mod) => (
+                  <div key={mod.id} className="rounded-xl border border-gray-200 bg-white pb-4 pt-5">
+                    {/* Section header */}
+                    <div className="flex items-center justify-between">
+                      {editingSectionId === mod.id ? (
+                        <div className="flex flex-1 items-center gap-2 px-5">
+                          <input
+                            autoFocus
+                            value={editingSectionTitle}
+                            onChange={(e) => setEditingSectionTitle(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === "Enter") saveSectionTitle(mod.id); if (e.key === "Escape") setEditingSectionId(null); }}
+                            className="h-10 flex-1 rounded-md border border-gray-300 px-3 text-base focus:border-indigo-600 focus:outline-none"
+                          />
+                          <button onClick={() => setEditingSectionId(null)} className="h-10 cursor-pointer rounded-md bg-gray-200 px-4 text-sm font-semibold hover:bg-gray-300">Cancel</button>
+                          <button onClick={() => saveSectionTitle(mod.id)} className="h-10 cursor-pointer rounded-md bg-indigo-600 px-4 text-sm font-semibold text-white hover:bg-indigo-700">Save</button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => { setEditingSectionId(mod.id); setEditingSectionTitle(mod.title); }}
+                          title="Rename section"
+                          className="-ml-px h-10 max-w-[70%] cursor-pointer truncate bg-indigo-600 pl-3.5 pr-9 text-left text-base font-semibold leading-10 text-white"
+                          style={{ clipPath: "polygon(0 0, calc(100% - 20px) 0, 100% 50%, calc(100% - 20px) 100%, 0 100%)" }}
                         >
-                          {/* Drop indicator line */}
-                          {isDragOver && !dragFromAbove && (
-                            <div className="h-0.5 bg-indigo-500 rounded-full mb-1.5 mx-2 transition-all duration-200" />
-                          )}
-
-                          {/* Chapter header row */}
-                          <div
-                            className={`flex items-center justify-between py-2.5 px-3 border rounded-lg cursor-pointer transition-all duration-200 ${
-                              isDragging
-                                ? "bg-indigo-50 border-indigo-300 opacity-50 scale-[0.98]"
-                                : "bg-white/80 border-gray-200 hover:bg-white"
-                            }`}
-                            onClick={() => toggleChapter(lesson.id)}
-                          >
-                            <div className="flex items-center gap-2">
-                              <div
-                                draggable
-                                onDragStart={(e) => {
-                                  dragItemRef.current = { moduleId: mod.id, lessonIdx };
-                                  setDraggingLesson(lesson.id);
-                                  e.dataTransfer.effectAllowed = "move";
-                                  const el = e.currentTarget.closest("[data-chapter]") as HTMLElement;
-                                  if (el) {
-                                    e.dataTransfer.setDragImage(el, 20, 20);
-                                  }
-                                }}
-                                onDragEnd={() => {
-                                  dragItemRef.current = null;
-                                  setDragOverTarget(null);
-                                  setDraggingLesson(null);
-                                }}
-                                onClick={(e) => e.stopPropagation()}
-                                className="cursor-grab active:cursor-grabbing p-0.5 -ml-1 text-gray-300 hover:text-gray-500 transition-colors"
-                              >
-                                <GripVertical className="h-4 w-4" />
-                              </div>
-                              {isExpanded ? (
-                                <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
-                              ) : (
-                                <ChevronRight className="h-3.5 w-3.5 text-gray-400" />
-                              )}
-                              <span className="text-sm font-semibold text-gray-700">
-                                Chapter {lessonIdx + 1}:
-                              </span>
-                              {getContentIcon(lesson)}
-                              <span className="text-sm text-gray-600">{lesson.title}</span>
-                            </div>
-                            <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                              {!isExpanded && (
-                                <button
-                                  onClick={() => {
-                                    setExpandedChapters((prev) => new Set(prev).add(lesson.id));
-                                    setShowContentPicker(lesson.id);
-                                  }}
-                                  className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1 cursor-pointer"
-                                >
-                                  + Content
-                                </button>
-                              )}
+                          {mod.title}
+                        </button>
+                      )}
+                      <div className="relative pr-4">
+                        <button
+                          onClick={() => setSectionMenu(sectionMenu === mod.id ? null : mod.id)}
+                          aria-label="Section options"
+                          className="cursor-pointer p-1 text-gray-800 hover:text-black"
+                        >
+                          <GripVertical className="h-5 w-5" />
+                        </button>
+                        {sectionMenu === mod.id && (
+                          <>
+                            <div className="fixed inset-0 z-10" onClick={() => setSectionMenu(null)} />
+                            <div className="absolute right-4 top-full z-20 w-40 rounded-lg border border-gray-200 bg-white py-1.5 shadow-lg">
                               <button
-                                onClick={() => deleteChapter(mod.id, lesson.id)}
-                                className="p-1 text-gray-300 hover:text-red-500 cursor-pointer"
+                                onClick={() => { setSectionMenu(null); setEditingSectionId(mod.id); setEditingSectionTitle(mod.title); }}
+                                className="w-full cursor-pointer px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
                               >
-                                <Trash2 className="h-3 w-3" />
+                                Rename
+                              </button>
+                              <button
+                                onClick={() => deleteSection(mod.id)}
+                                className="w-full cursor-pointer px-4 py-2 text-left text-sm text-red-500 hover:bg-red-50"
+                              >
+                                Delete
                               </button>
                             </div>
-                          </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
 
-                          {/* Expanded chapter content */}
-                          {isExpanded && (
-                            <div className="ml-4 mt-1 p-4 bg-white/60 border border-gray-200 border-t-0 rounded-b-lg space-y-3">
-                              {/* Content type picker */}
-                              {showContentPicker === lesson.id && !lesson.videoUrl && (
-                                <div className="text-center py-4">
-                                  <p className="text-sm text-gray-500 mb-4">
-                                    Select the main type of content. Files and links can be added as resources.
-                                  </p>
-                                  <div className="flex items-center justify-center gap-3">
+                    {/* Chapters */}
+                    <div className="mt-4 pl-16 pr-4">
+                      {mod.lessons.map((lesson, lessonIdx) => {
+                        const isExpanded = expandedChapters.has(lesson.id);
+                        const isEditingDesc = editingDescription?.lessonId === lesson.id;
+                        const isEditingTitle = editingChapter?.lessonId === lesson.id;
+                        const isDragOver = dragOverTarget?.moduleId === mod.id && dragOverTarget?.lessonIdx === lessonIdx;
+                        const isDragging = draggingLesson === lesson.id;
+                        const dragFromAbove = dragItemRef.current && dragItemRef.current.moduleId === mod.id && dragItemRef.current.lessonIdx < lessonIdx;
+                        const resources = parseResources(lesson);
+                        const hasDescription = !!lesson.content && lesson.content !== "<p></p>";
+                        return (
+                          <div
+                            key={lesson.id}
+                            data-chapter
+                            className="mb-4 transition-transform duration-200 ease-in-out"
+                            style={{
+                              transform: isDragOver ? (dragFromAbove ? "translateY(4px)" : "translateY(-4px)") : "translateY(0)",
+                            }}
+                            onDragOver={(e) => {
+                              e.preventDefault();
+                              e.dataTransfer.dropEffect = "move";
+                              if (dragItemRef.current?.moduleId === mod.id && dragItemRef.current.lessonIdx !== lessonIdx) {
+                                setDragOverTarget({ moduleId: mod.id, lessonIdx });
+                              }
+                            }}
+                            onDragLeave={() => {
+                              if (dragOverTarget?.lessonIdx === lessonIdx) setDragOverTarget(null);
+                            }}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              if (dragItemRef.current?.moduleId === mod.id) {
+                                reorderChapters(mod.id, dragItemRef.current.lessonIdx, lessonIdx);
+                              }
+                              dragItemRef.current = null;
+                              setDragOverTarget(null);
+                              setDraggingLesson(null);
+                            }}
+                          >
+                            {isDragOver && !dragFromAbove && <div className="mx-2 mb-1.5 h-0.5 rounded-full bg-indigo-600" />}
+
+                            <div className={`rounded-lg bg-gray-100 transition-opacity ${isDragging ? "opacity-50" : ""}`}>
+                              {/* Chapter header row */}
+                              {isEditingTitle && editingChapter ? (
+                                <div className="px-4 py-4">
+                                  <div className="flex items-center gap-3">
+                                    <span className="shrink-0 text-lg font-semibold text-black">Chapter {lessonIdx + 1}:</span>
+                                    <input
+                                      autoFocus
+                                      value={editingChapter.title}
+                                      onChange={(e) => setEditingChapter({ ...editingChapter, title: e.target.value })}
+                                      onKeyDown={(e) => { if (e.key === "Enter") saveChapterEdit(); if (e.key === "Escape") setEditingChapter(null); }}
+                                      className="h-11 flex-1 rounded-md border border-gray-400 bg-white px-3 text-base focus:border-indigo-600 focus:outline-none"
+                                    />
+                                  </div>
+                                  <div className="mt-3 flex flex-wrap items-center justify-between gap-3 pl-[104px]">
+                                    <div className="flex items-center gap-3">
+                                      <Toggle on={editingChapter.isFree} onChange={(v) => setEditingChapter({ ...editingChapter, isFree: v })} />
+                                      <span className="text-base text-gray-900">Make this chapter free for locked course viewers.</span>
+                                      <FreeInfo />
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                      <button onClick={() => setEditingChapter(null)} className="h-11 cursor-pointer rounded-md bg-gray-200 px-5 text-base font-semibold text-black hover:bg-gray-300">Cancel</button>
+                                      <button
+                                        onClick={saveChapterEdit}
+                                        disabled={!editingChapter.title.trim() || savingChapter}
+                                        className="h-11 cursor-pointer rounded-md bg-indigo-600 px-5 text-base font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-40"
+                                      >
+                                        Save
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div
+                                  className={`group flex h-16 cursor-pointer items-center justify-between px-4 ${isExpanded ? "border-b border-gray-200" : ""}`}
+                                  onClick={() => toggleChapter(lesson.id)}
+                                >
+                                  <div className="flex min-w-0 items-center gap-3">
+                                    <Caret open={isExpanded} />
+                                    <span className="shrink-0 text-lg font-semibold text-black">Chapter {lessonIdx + 1}:</span>
+                                    {lesson.videoUrl ? (
+                                      isFileUrl(lesson.videoUrl) ? <MdPlayCircle className="h-5 w-5 shrink-0 text-gray-800" /> : <MdLink className="h-5 w-5 shrink-0 text-gray-800" />
+                                    ) : (
+                                      <MdInsertDriveFile className="h-5 w-5 shrink-0 text-gray-800" />
+                                    )}
+                                    <span className="truncate text-base text-gray-900">{lesson.title}</span>
+                                    {lesson.isFree && (
+                                      <span className="shrink-0 rounded bg-green-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-green-700">Free</span>
+                                    )}
+                                    <span className="ml-1 hidden items-center gap-2 group-hover:flex" onClick={(e) => e.stopPropagation()}>
+                                      <button
+                                        onClick={() => setEditingChapter({ moduleId: mod.id, lessonId: lesson.id, title: lesson.title, isFree: !!lesson.isFree })}
+                                        aria-label="Edit chapter"
+                                        className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-gray-200 hover:bg-gray-300"
+                                      >
+                                        <Pencil className="h-3.5 w-3.5 text-gray-800" />
+                                      </button>
+                                      <button
+                                        onClick={() => deleteChapter(mod.id, lesson.id)}
+                                        aria-label="Delete chapter"
+                                        className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-gray-200 hover:bg-gray-300"
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5 text-gray-800" />
+                                      </button>
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-3">
+                                  {isExpanded && !lesson.videoUrl && (
                                     <button
-                                      onClick={() => {
-                                        setShowContentPicker(null);
-                                        setShowVideoModal({ moduleId: mod.id, lessonId: lesson.id });
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setPickerClosed((prev) => { const n = new Set(prev); if (n.has(lesson.id)) n.delete(lesson.id); else n.add(lesson.id); return n; });
                                       }}
-                                      className="w-12 h-12 rounded-lg bg-gray-50 hover:bg-gray-100 flex items-center justify-center transition-colors cursor-pointer border border-gray-200"
-                                      title="Upload Video"
+                                      className="flex h-10 cursor-pointer items-center gap-2 rounded-md bg-gray-200 px-4 text-base font-semibold text-black hover:bg-gray-300"
                                     >
-                                      <Video className="h-5 w-5 text-red-500" />
+                                      <Plus className="h-4 w-4" /> Content
                                     </button>
-                                    <button
-                                      onClick={() => {
-                                        setShowContentPicker(null);
-                                        setShowVideoModal({ moduleId: mod.id, lessonId: lesson.id });
-                                      }}
-                                      className="w-12 h-12 rounded-lg bg-gray-50 hover:bg-gray-100 flex items-center justify-center transition-colors cursor-pointer border border-gray-200"
-                                      title="YouTube / URL"
-                                    >
-                                      <PlayCircle className="h-5 w-5 text-orange-500" />
-                                    </button>
-                                    <button
-                                      onClick={() => toast("Audio upload coming soon")}
-                                      className="w-12 h-12 rounded-lg bg-gray-50 hover:bg-gray-100 flex items-center justify-center transition-colors cursor-pointer border border-gray-200"
-                                      title="Audio"
-                                    >
-                                      <Headphones className="h-5 w-5 text-orange-400" />
-                                    </button>
-                                    <button
-                                      onClick={() => toast("Image upload coming soon")}
-                                      className="w-12 h-12 rounded-lg bg-gray-50 hover:bg-gray-100 flex items-center justify-center transition-colors cursor-pointer border border-gray-200"
-                                      title="Image"
-                                    >
-                                      <ImageIcon className="h-5 w-5 text-green-500" />
-                                    </button>
-                                    <button
-                                      onClick={() => toast("PDF upload coming soon")}
-                                      className="w-12 h-12 rounded-lg bg-gray-50 hover:bg-gray-100 flex items-center justify-center transition-colors cursor-pointer border border-gray-200"
-                                      title="PDF"
-                                    >
-                                      <span className="text-xs font-bold text-red-600">PDF</span>
-                                    </button>
-                                    <button
-                                      onClick={() => toast("Link content coming soon")}
-                                      className="w-12 h-12 rounded-lg bg-gray-50 hover:bg-gray-100 flex items-center justify-center transition-colors cursor-pointer border border-gray-200"
-                                      title="Link"
-                                    >
-                                      <LinkIcon className="h-5 w-5 text-blue-500" />
-                                    </button>
-                                    <button
-                                      onClick={() => {
-                                        setShowContentPicker(null);
-                                        setEditingDescription({ moduleId: mod.id, lessonId: lesson.id, content: lesson.content || "" });
-                                      }}
-                                      className="w-12 h-12 rounded-lg bg-gray-50 hover:bg-gray-100 flex items-center justify-center transition-colors cursor-pointer border border-gray-200"
-                                      title="Text"
-                                    >
-                                      <FileText className="h-5 w-5 text-gray-600" />
-                                    </button>
+                                  )}
+                                  <div
+                                    draggable
+                                    onDragStart={(e) => {
+                                      dragItemRef.current = { moduleId: mod.id, lessonIdx };
+                                      setDraggingLesson(lesson.id);
+                                      e.dataTransfer.effectAllowed = "move";
+                                      const el = e.currentTarget.closest("[data-chapter]") as HTMLElement;
+                                      if (el) e.dataTransfer.setDragImage(el, 20, 20);
+                                    }}
+                                    onDragEnd={() => {
+                                      dragItemRef.current = null;
+                                      setDragOverTarget(null);
+                                      setDraggingLesson(null);
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                    title="Drag to reorder"
+                                    className="cursor-grab p-1 text-gray-800 active:cursor-grabbing"
+                                  >
+                                    <GripVertical className="h-5 w-5" />
+                                  </div>
                                   </div>
                                 </div>
                               )}
 
-                              {/* Video file info */}
-                              {lesson.videoUrl && (
-                                <div className="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-100">
-                                  {lesson.thumbnail ? (
-                                    <img src={lesson.thumbnail} alt="" className="w-14 h-10 rounded object-cover bg-gray-900" />
-                                  ) : (
-                                    <div className="w-14 h-10 rounded bg-gray-900 flex items-center justify-center">
-                                      <PlayCircle className="h-5 w-5 text-white" />
+                              {/* Expanded chapter content */}
+                              {isExpanded && !isEditingTitle && (
+                                <div className="space-y-5 px-6 pb-8 pt-6">
+                                  {/* Main content: picker until something is chosen */}
+                                  {!lesson.videoUrl && !pickerClosed.has(lesson.id) && (
+                                    <div className="relative py-2 text-center">
+                                      <button
+                                        onClick={() => setPickerClosed((prev) => new Set(prev).add(lesson.id))}
+                                        aria-label="Close"
+                                        className="absolute right-2 top-0 cursor-pointer p-1 text-gray-600 hover:text-black"
+                                      >
+                                        <X className="h-4 w-4" />
+                                      </button>
+                                      <p className="text-base text-gray-900">
+                                        Select the main type of content. Files and links can be added as resources.
+                                      </p>
+                                      <div className="mt-6 flex items-center justify-center gap-5">
+                                        <FileTile color="#e0486e" title="Upload video" onClick={() => setShowVideoModal({ moduleId: mod.id, lessonId: lesson.id, mode: "upload" })}>
+                                          <MdPlayCircle className="h-6 w-6 text-white" />
+                                        </FileTile>
+                                        <FileTile color="#f59e0b" title="Upload audio" onClick={() => toast("Audio upload coming soon")}>
+                                          <MdHeadset className="h-6 w-6 text-white" />
+                                        </FileTile>
+                                        <FileTile color="#17809b" title="Upload image" onClick={() => toast("Image upload coming soon")}>
+                                          <MdImage className="h-6 w-6 text-white" />
+                                        </FileTile>
+                                        <FileTile color="#e53935" title="Upload PDF" onClick={() => toast("PDF upload coming soon")}>
+                                          <span className="text-xs font-extrabold text-white">PDF</span>
+                                        </FileTile>
+                                        <FileTile color="#1fa463" title="Add discussion" onClick={() => toast("Coming soon")}>
+                                          <MdQuestionAnswer className="h-6 w-6 text-white" />
+                                        </FileTile>
+                                        <FileTile color="#4f46e5" title="Add embedded link" onClick={() => setShowVideoModal({ moduleId: mod.id, lessonId: lesson.id, mode: "url" })}>
+                                          <MdLink className="h-7 w-7 text-white" />
+                                        </FileTile>
+                                        <span className="h-12 w-px bg-gray-300" />
+                                        <button
+                                          type="button"
+                                          aria-label="Add article"
+                                          onClick={() => setEditingDescription({ moduleId: mod.id, lessonId: lesson.id, content: lesson.content || "" })}
+                                          className="group relative cursor-pointer text-[#0f1c3f]"
+                                        >
+                                          <MdEditNote className="h-14 w-14" />
+                                          <Tip text="Add article" />
+                                        </button>
+                                      </div>
                                     </div>
                                   )}
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium text-gray-800 truncate">
-                                      {lesson.title}.MP4
-                                    </p>
-                                    <p className="text-xs text-gray-400">MP4 · Video</p>
-                                  </div>
-                                  <button
-                                    onClick={() => setShowVideoModal({ moduleId: mod.id, lessonId: lesson.id })}
-                                    className="p-2 text-gray-400 hover:text-gray-600 cursor-pointer"
-                                  >
-                                    <Pencil className="h-4 w-4" />
-                                  </button>
-                                </div>
-                              )}
 
-                              {/* Description */}
-                              {lesson.content && !isEditingDesc && (
-                                <div className="space-y-1">
-                                  <div className="flex items-center justify-between">
-                                    <h4 className="text-sm font-semibold text-gray-800">Chapter Description</h4>
-                                    <button
-                                      onClick={() => setEditingDescription({ moduleId: mod.id, lessonId: lesson.id, content: lesson.content || "" })}
-                                      className="p-1 text-gray-400 hover:text-gray-600 cursor-pointer"
-                                    >
-                                      <Pencil className="h-3.5 w-3.5" />
-                                    </button>
-                                  </div>
-                                  <div
-                                    className="text-sm text-gray-600 prose prose-sm max-w-none"
-                                    dangerouslySetInnerHTML={{ __html: lesson.content }}
-                                  />
-                                </div>
-                              )}
+                                  {/* Main content item */}
+                                  {lesson.videoUrl && (
+                                    <div className="flex items-center gap-4 rounded-lg bg-white p-5">
+                                      <div className="flex h-[67px] w-[91px] shrink-0 items-center justify-center overflow-hidden bg-[#0f1c3f]">
+                                        {lesson.thumbnail ? (
+                                          // eslint-disable-next-line @next/next/no-img-element
+                                          <img src={lesson.thumbnail} alt="" className="h-full w-full object-cover" />
+                                        ) : isFileUrl(lesson.videoUrl) ? (
+                                          <MdPlayArrow className="h-9 w-9 text-white" />
+                                        ) : (
+                                          <MdLink className="h-9 w-9 text-white" />
+                                        )}
+                                      </div>
+                                      <div className="min-w-0 flex-1">
+                                        <p className="text-lg font-semibold text-black">
+                                          {isFileUrl(lesson.videoUrl) ? "Video" : "Embedded Link"}
+                                        </p>
+                                        <p className="break-all text-base leading-6 text-indigo-600">{decodeUrl(lesson.videoUrl)}</p>
+                                      </div>
+                                      <button
+                                        onClick={() => setShowVideoModal({ moduleId: mod.id, lessonId: lesson.id, mode: isFileUrl(lesson.videoUrl!) ? "upload" : "url" })}
+                                        aria-label="Edit content"
+                                        className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center self-start rounded-full bg-gray-200 hover:bg-gray-300"
+                                      >
+                                        <Pencil className="h-4 w-4 text-gray-800" />
+                                      </button>
+                                    </div>
+                                  )}
 
-                              {/* Description editor */}
-                              {isEditingDesc && editingDescription && (
-                                <div className="space-y-2">
-                                  <h4 className="text-sm font-semibold text-gray-800">Chapter Description</h4>
-                                  <RichTextEditor
-                                    value={editingDescription.content}
-                                    onChange={(val) => setEditingDescription({ ...editingDescription, content: val })}
-                                    placeholder="Write a description for this chapter..."
-                                  />
-                                  <div className="flex justify-end gap-2">
+                                  {/* Description */}
+                                  {isEditingDesc && editingDescription ? (
+                                    <div className="rounded-lg bg-white p-5">
+                                      <h4 className="mb-3 text-lg font-semibold text-black">Chapter description</h4>
+                                      <RichTextEditor
+                                        value={editingDescription.content}
+                                        onChange={(val) => setEditingDescription({ ...editingDescription, content: val })}
+                                        placeholder="Write a description for this chapter..."
+                                      />
+                                      <div className="mt-3 flex justify-end gap-3">
+                                        <button onClick={() => setEditingDescription(null)} className="h-10 cursor-pointer rounded-md bg-gray-200 px-5 text-sm font-semibold hover:bg-gray-300">Cancel</button>
+                                        <button onClick={saveDescription} className="h-10 cursor-pointer rounded-md bg-indigo-600 px-5 text-sm font-semibold text-white hover:bg-indigo-700">Save</button>
+                                      </div>
+                                    </div>
+                                  ) : hasDescription ? (
+                                    <div className="flex items-start gap-4 rounded-lg bg-white p-5">
+                                      <div className="min-w-0 flex-1">
+                                        <h4 className="text-lg font-semibold text-black">Chapter description</h4>
+                                        <div
+                                          className="prose prose-sm mt-2 max-w-none text-base text-gray-800 [&_a]:text-indigo-600"
+                                          dangerouslySetInnerHTML={{ __html: lesson.content! }}
+                                        />
+                                      </div>
+                                      <button
+                                        onClick={() => setEditingDescription({ moduleId: mod.id, lessonId: lesson.id, content: lesson.content || "" })}
+                                        aria-label="Edit description"
+                                        className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full bg-gray-200 hover:bg-gray-300"
+                                      >
+                                        <Pencil className="h-4 w-4 text-gray-800" />
+                                      </button>
+                                    </div>
+                                  ) : (
                                     <button
-                                      onClick={() => setEditingDescription(null)}
-                                      className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 cursor-pointer"
+                                      onClick={() => setEditingDescription({ moduleId: mod.id, lessonId: lesson.id, content: "" })}
+                                      className="flex cursor-pointer items-center gap-2 text-base text-indigo-600 hover:underline"
                                     >
-                                      Cancel
+                                      <Plus className="h-4 w-4" /> Add chapter description
                                     </button>
-                                    <button
-                                      onClick={saveDescription}
-                                      className="px-4 py-1.5 text-sm text-white bg-gray-900 rounded-lg hover:bg-gray-800 cursor-pointer"
-                                    >
-                                      Save
-                                    </button>
-                                  </div>
-                                </div>
-                              )}
+                                  )}
 
-                              {/* Chapter Resources */}
-                              {(() => {
-                                const resources = parseResources(lesson);
-                                return resources.length > 0 ? (
-                                  <div className="space-y-1">
-                                    <h4 className="text-sm font-semibold text-gray-800">Chapter Resources</h4>
-                                    <div className="space-y-1.5">
+                                  {/* Resources */}
+                                  {resources.length > 0 && (
+                                    <div className="space-y-2">
+                                      <h4 className="text-lg font-semibold text-black">Chapter resources</h4>
                                       {resources.map((res, ri) => (
-                                        <div key={ri} className="flex items-center gap-2 p-2 bg-white rounded-lg border border-gray-100">
-                                          <div className="w-8 h-8 rounded bg-red-50 flex items-center justify-center shrink-0">
+                                        <div key={ri} className="flex items-center gap-3 rounded-lg bg-white p-3">
+                                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded bg-red-50">
                                             <span className="text-[10px] font-bold text-red-600">{res.type}</span>
                                           </div>
-                                          <div className="flex-1 min-w-0">
-                                            <p className="text-sm text-gray-700 truncate">{res.name}</p>
-                                          </div>
+                                          <p className="min-w-0 flex-1 truncate text-base text-gray-800">{res.name}</p>
                                           <button
                                             onClick={() => deleteResource(mod.id, lesson.id, ri)}
-                                            className="p-1 text-gray-300 hover:text-red-500 cursor-pointer"
+                                            aria-label="Remove resource"
+                                            className="cursor-pointer p-1 text-gray-400 hover:text-red-500"
                                           >
-                                            <Trash2 className="h-3.5 w-3.5" />
+                                            <Trash2 className="h-4 w-4" />
                                           </button>
                                         </div>
                                       ))}
                                     </div>
-                                  </div>
-                                ) : null;
-                              })()}
+                                  )}
 
-                              {/* Action buttons when no content yet or adding more */}
-                              {!isEditingDesc && (
-                                <div className="flex items-center gap-3">
-                                  {!lesson.content && (
+                                  <div className="flex flex-wrap items-center gap-4">
                                     <button
-                                      onClick={() => setEditingDescription({ moduleId: mod.id, lessonId: lesson.id, content: "" })}
-                                      className="text-xs text-gray-500 hover:text-gray-700 cursor-pointer"
+                                      onClick={() => {
+                                        resourceTargetRef.current = { moduleId: mod.id, lessonId: lesson.id };
+                                        resourceInputRef.current?.click();
+                                      }}
+                                      className="flex h-[45px] cursor-pointer items-center gap-2 rounded-md bg-indigo-600 px-5 text-base font-semibold text-white hover:bg-indigo-700"
                                     >
-                                      + Description
+                                      {uploadingResource === lesson.id ? (
+                                        <><Loader2 className="h-4 w-4 animate-spin" /> Uploading...</>
+                                      ) : (
+                                        <><Upload className="h-4 w-4" /> Upload resources</>
+                                      )}
                                     </button>
-                                  )}
-                                  {!lesson.videoUrl && showContentPicker !== lesson.id && (
-                                    <button
-                                      onClick={() => setShowContentPicker(lesson.id)}
-                                      className="text-xs text-gray-500 hover:text-gray-700 cursor-pointer"
-                                    >
-                                      + Content
-                                    </button>
-                                  )}
-                                  <button
-                                    onClick={() => {
-                                      resourceTargetRef.current = { moduleId: mod.id, lessonId: lesson.id };
-                                      resourceInputRef.current?.click();
-                                    }}
-                                    className="text-xs text-gray-500 hover:text-gray-700 cursor-pointer flex items-center gap-1"
-                                  >
-                                    {uploadingResource === lesson.id ? (
-                                      <><Loader2 className="h-3 w-3 animate-spin" /> Uploading...</>
-                                    ) : (
-                                      <>+ Resources</>
+                                    {!lesson.videoUrl && pickerClosed.has(lesson.id) && (
+                                      <button
+                                        onClick={() => setPickerClosed((prev) => { const n = new Set(prev); n.delete(lesson.id); return n; })}
+                                        className="cursor-pointer text-base text-indigo-600 hover:underline"
+                                      >
+                                        + Add content
+                                      </button>
                                     )}
-                                  </button>
+                                  </div>
                                 </div>
                               )}
                             </div>
-                          )}
 
-                          {/* Bottom drop indicator */}
-                          {isDragOver && dragFromAbove && (
-                            <div className="h-0.5 bg-indigo-500 rounded-full mt-1.5 mx-2 transition-all duration-200" />
-                          )}
+                            {isDragOver && dragFromAbove && <div className="mx-2 mt-1.5 h-0.5 rounded-full bg-indigo-600" />}
+                          </div>
+                        );
+                      })}
+
+                      {/* Add chapter */}
+                      {addingChapter?.moduleId === mod.id ? (
+                        <div className="rounded-lg bg-gray-100 px-4 py-4">
+                          <div className="flex items-center gap-3">
+                            <Caret open={false} />
+                            <span className="shrink-0 text-lg font-semibold text-black">Chapter {mod.lessons.length + 1}</span>
+                            <input
+                              autoFocus
+                              value={addingChapter.title}
+                              onChange={(e) => setAddingChapter({ ...addingChapter, title: e.target.value })}
+                              onKeyDown={(e) => { if (e.key === "Enter") addChapter(); if (e.key === "Escape") setAddingChapter(null); }}
+                              placeholder="Add a title..."
+                              className="h-11 flex-1 rounded-md border border-gray-900 bg-white px-3 text-base placeholder:text-gray-500 focus:outline-none"
+                            />
+                          </div>
+                          <div className="mt-3 flex flex-wrap items-center justify-between gap-3 pl-[88px]">
+                            <div className="flex items-center gap-3">
+                              <Toggle on={addingChapter.isFree} onChange={(v) => setAddingChapter({ ...addingChapter, isFree: v })} />
+                              <span className="text-base text-gray-900">Make this chapter free for locked course viewers.</span>
+                              <FreeInfo />
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <button onClick={() => setAddingChapter(null)} className="h-11 cursor-pointer rounded-md bg-gray-200 px-5 text-base font-semibold text-black hover:bg-gray-300">Cancel</button>
+                              <button
+                                onClick={addChapter}
+                                disabled={!addingChapter.title.trim() || savingChapter}
+                                className="h-11 cursor-pointer rounded-md bg-indigo-600 px-5 text-base font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-40"
+                              >
+                                Save
+                              </button>
+                            </div>
+                          </div>
                         </div>
-                      );
-                    })}
-
-                    {/* Add chapter inline */}
-                    {showAddChapter === mod.id ? (
-                      <div className="flex items-center gap-2 mt-2 px-3">
-                        <input
-                          autoFocus
-                          value={newChapterTitle}
-                          onChange={(e) => setNewChapterTitle(e.target.value)}
-                          onKeyDown={(e) => { if (e.key === "Enter") addChapter(mod.id); if (e.key === "Escape") { setShowAddChapter(null); setNewChapterTitle(""); } }}
-                          placeholder="Chapter title..."
-                          className="flex-1 text-sm bg-white border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-400"
-                        />
-                        <button onClick={() => { setShowAddChapter(null); setNewChapterTitle(""); }} className="text-xs text-gray-500 hover:text-gray-700 cursor-pointer">Cancel</button>
-                        <button onClick={() => addChapter(mod.id)} className="text-xs text-white bg-gray-900 px-3 py-1.5 rounded cursor-pointer">Add</button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => { setShowAddChapter(mod.id); setNewChapterTitle(""); }}
-                        className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-indigo-600 mt-3 px-3 cursor-pointer"
-                      >
-                        <Plus className="h-3.5 w-3.5" /> Add more chapters
-                      </button>
-                    )}
+                      ) : (
+                        <button
+                          onClick={() => setAddingChapter({ moduleId: mod.id, title: "", isFree: false })}
+                          className="flex cursor-pointer items-center gap-2 py-1 text-base text-indigo-600 hover:underline"
+                        >
+                          <Plus className="h-4 w-4" /> Add more chapters
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
 
-              {/* Add new section */}
-              <button
-                onClick={addSection}
-                className="w-auto py-2.5 px-5 border-2 border-dashed border-gray-300 rounded-xl text-sm text-gray-500 hover:border-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
-              >
-                + Add new section
-              </button>
+                <button
+                  onClick={addSection}
+                  className="relative flex h-10 cursor-pointer items-center gap-2 pl-6 pr-10 text-base font-semibold text-black hover:text-indigo-600"
+                >
+                  <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 h-full w-full" aria-hidden>
+                    <polygon points="0.5,0.5 90,0.5 99.5,50 90,99.5 0.5,99.5" fill="none" stroke="currentColor" strokeWidth="1" strokeDasharray="4 3" vectorEffect="non-scaling-stroke" />
+                  </svg>
+                  <Plus className="relative h-4 w-4" /> <span className="relative">Add new section</span>
+                </button>
+              </div>
             </div>
           )}
 
           {activeTab === "information" && (
-            <div className="max-w-2xl">
-              <h2 className="text-xl font-bold text-gray-900 mb-6">Course Information</h2>
-              <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
+            <div className="max-w-2xl rounded-xl border border-gray-200 bg-white">
+              <div className="border-b border-gray-200 px-6 py-5">
+                <h2 className="text-2xl font-semibold text-black">Course information</h2>
+              </div>
+              <div className="space-y-5 p-6">
                 <Input
                   id="title"
                   label="Title"
@@ -808,34 +953,37 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
                   rows={5}
                 />
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Thumbnail</label>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Thumbnail</label>
                   <FileUpload
                     type="image"
                     value={form.thumbnail}
                     onChange={(url) => setForm((prev) => ({ ...prev, thumbnail: url }))}
                   />
                 </div>
-                <div className="flex justify-end">
+                <div className="flex items-center justify-between border-t border-gray-100 pt-5">
+                  <div className="flex items-center gap-3">
+                    <Toggle on={course.published} onChange={togglePublish} />
+                    <span className="text-base text-gray-900">{course.published ? "Published" : "Draft: not visible to learners"}</span>
+                  </div>
                   <Button onClick={saveCourse} loading={saving}>
-                    Save Changes
+                    Save changes
                   </Button>
                 </div>
               </div>
             </div>
           )}
-        </div>
+        </main>
       </div>
 
-      {/* Upload Video Modal */}
+      {/* Video / embedded link modal */}
       <Modal
         open={showVideoModal !== null}
         onClose={() => setShowVideoModal(null)}
-        title="Upload Video"
+        title={showVideoModal?.mode === "url" ? "Embedded link" : "Upload video"}
       >
         {showVideoModal && (
           <VideoUploadContent
-            moduleId={showVideoModal.moduleId}
-            lessonId={showVideoModal.lessonId}
+            initialMode={showVideoModal.mode}
             currentUrl={course.modules
               .find((m) => m.id === showVideoModal.moduleId)
               ?.lessons.find((l) => l.id === showVideoModal.lessonId)?.videoUrl || ""}
@@ -844,10 +992,9 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
               ?.lessons.find((l) => l.id === showVideoModal.lessonId)?.thumbnail || ""}
             onSave={async (videoUrl, thumbnail) => {
               await updateChapter(showVideoModal.moduleId, showVideoModal.lessonId, { videoUrl, thumbnail });
-              toast.success("Video saved");
+              toast.success("Saved");
               setShowVideoModal(null);
             }}
-            onClose={() => setShowVideoModal(null)}
           />
         )}
       </Modal>
@@ -864,61 +1011,69 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
   );
 }
 
+/** The (i) next to the free-chapter switch, with the explanation on hover or focus. */
+function FreeInfo() {
+  return (
+    <span className="group relative inline-flex">
+      <button type="button" aria-label="About free chapters" className="cursor-pointer text-gray-700">
+        <InfoIcon className="h-4 w-4" />
+      </button>
+      <span className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 hidden w-80 -translate-x-1/2 rounded-lg bg-white p-4 text-base leading-6 text-gray-900 shadow-xl ring-1 ring-gray-200 group-focus-within:block group-hover:block">
+        Making this chapter free, will show this chapter to the customer who&rsquo;s seeing the rest of the course as locked and is prompted to upgrade. You can show a course as locked to customers who haven&rsquo;t purchased it yet. This can be done from the Information tab.
+      </span>
+    </span>
+  );
+}
+
 function VideoUploadContent({
+  initialMode,
   currentUrl,
   currentThumb,
   onSave,
-  onClose,
 }: {
-  moduleId: string;
-  lessonId: string;
+  initialMode: VideoMode;
   currentUrl: string;
   currentThumb: string;
   onSave: (videoUrl: string, thumbnail: string) => void;
-  onClose: () => void;
 }) {
   const [videoUrl, setVideoUrl] = useState(currentUrl);
   const [thumbnail, setThumbnail] = useState(currentThumb);
-  const [mode, setMode] = useState<"upload" | "url">("upload");
+  const [mode, setMode] = useState<VideoMode>(initialMode);
 
   return (
     <div className="space-y-4">
       {/* Video preview */}
-      {videoUrl && (
-        <div className="relative rounded-lg overflow-hidden bg-black">
-          <video
-            src={videoUrl}
-            controls
-            className="w-full max-h-64 object-contain"
-          />
+      {videoUrl && isFileUrl(videoUrl) && (
+        <div className="relative overflow-hidden rounded-lg bg-black">
+          <video src={videoUrl} controls className="max-h-64 w-full object-contain" />
           <button
             onClick={() => setVideoUrl("")}
-            className="absolute top-2 right-2 text-xs text-gray-300 hover:text-white bg-black/50 px-2 py-1 rounded cursor-pointer"
+            className="absolute right-2 top-2 cursor-pointer rounded bg-black/50 px-2 py-1 text-xs text-gray-300 hover:text-white"
           >
-            Replace Video
+            Replace video
           </button>
         </div>
       )}
 
       {/* Upload area */}
-      {!videoUrl && (
+      {!(videoUrl && isFileUrl(videoUrl)) && (
         <div>
-          <div className="flex gap-2 mb-3">
+          <div className="mb-3 flex gap-2">
             <button
               onClick={() => setMode("upload")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
-                mode === "upload" ? "bg-indigo-50 text-indigo-700" : "text-gray-500 bg-gray-50 hover:bg-gray-100"
+              className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                mode === "upload" ? "bg-indigo-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
               }`}
             >
               <Upload className="h-3 w-3" /> Upload
             </button>
             <button
               onClick={() => setMode("url")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
-                mode === "url" ? "bg-indigo-50 text-indigo-700" : "text-gray-500 bg-gray-50 hover:bg-gray-100"
+              className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                mode === "url" ? "bg-indigo-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
               }`}
             >
-              <LinkIcon className="h-3 w-3" /> URL
+              <MdLink className="h-3.5 w-3.5" /> Link
             </button>
           </div>
           {mode === "upload" ? (
@@ -926,10 +1081,10 @@ function VideoUploadContent({
           ) : (
             <input
               type="text"
-              placeholder="https://youtube.com/... or video URL"
+              placeholder="https://youtube.com/... or Vimeo / video URL"
               value={videoUrl}
               onChange={(e) => setVideoUrl(e.target.value)}
-              className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-indigo-600 focus:outline-none"
             />
           )}
         </div>
@@ -937,18 +1092,17 @@ function VideoUploadContent({
 
       {/* Thumbnail */}
       <div>
-        <p className="text-sm font-medium text-gray-700 mb-1">Add Thumbnail (Optional)</p>
-        <p className="text-xs text-gray-400 mb-2">You can upload a thumbnail for your video.</p>
+        <p className="mb-1 text-sm font-medium text-gray-700">Add thumbnail (optional)</p>
+        <p className="mb-2 text-xs text-gray-400">You can upload a thumbnail for your video.</p>
         <FileUpload type="image" value={thumbnail} onChange={setThumbnail} />
       </div>
 
-      {/* Save button */}
       <button
-        onClick={() => onSave(videoUrl, thumbnail)}
-        disabled={!videoUrl}
-        className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold transition-colors disabled:opacity-40 cursor-pointer"
+        onClick={() => onSave(videoUrl.trim(), thumbnail)}
+        disabled={!videoUrl.trim()}
+        className="w-full cursor-pointer rounded-md bg-indigo-600 py-3 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-40"
       >
-        Save Video
+        Save
       </button>
     </div>
   );
