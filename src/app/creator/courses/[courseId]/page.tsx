@@ -2,11 +2,8 @@
 
 import { useEffect, useState, useRef, use } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
-import { Input } from "@/components/ui/input";
 import { FileUpload } from "@/components/file-upload";
-import { Textarea } from "@/components/ui/textarea";
 import {
   ArrowLeft,
   Plus,
@@ -40,6 +37,7 @@ import {
 } from "react-icons/md";
 import toast from "react-hot-toast";
 import { RichTextEditor } from "@/components/rich-text-editor";
+import { CourseInfoTab, type CourseInfo } from "@/components/creator/course-info-tab";
 
 interface Resource {
   name: string;
@@ -65,12 +63,8 @@ interface Module {
   lessons: Lesson[];
 }
 
-interface Course {
-  id: string;
-  title: string;
+interface Course extends CourseInfo {
   slug: string;
-  description: string | null;
-  thumbnail: string | null;
   published: boolean;
   modules: Module[];
   _count: { enrollments: number };
@@ -174,9 +168,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
   const router = useRouter();
   const [course, setCourse] = useState<Course | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<SidebarTab>("curriculum");
-  const [form, setForm] = useState({ title: "", description: "", thumbnail: "" });
   const [logoUrl, setLogoUrl] = useState("");
 
   // Section (module) state
@@ -219,27 +211,19 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
     if (!res.ok) { router.push("/creator/courses"); return; }
     const data = await res.json();
     setCourse(data);
-    setForm({ title: data.title, description: data.description || "", thumbnail: data.thumbnail || "" });
     setLoading(false);
   }
 
-  async function saveCourse() {
-    setSaving(true);
-    try {
-      const res = await fetch(`/api/courses/${courseId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-      if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || "Failed to save"); }
-      toast.success("Saved!");
-      fetchCourse();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to save");
-    } finally { setSaving(false); }
-  }
-
   async function togglePublish() {
+    if (!course?.published) {
+      // TagMango marks these as required before a course can go live.
+      const plain = (course?.description || "").replace(/<[^>]*>/g, "").trim();
+      if (!plain || !course?.thumbnail) {
+        toast.error("Add a description and a cover image in the Information tab first");
+        setActiveTab("information");
+        return;
+      }
+    }
     await fetch(`/api/courses/${courseId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -934,43 +918,12 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
           )}
 
           {activeTab === "information" && (
-            <div className="max-w-2xl rounded-xl border border-gray-200 bg-white">
-              <div className="border-b border-gray-200 px-6 py-5">
-                <h2 className="text-2xl font-semibold text-black">Course information</h2>
-              </div>
-              <div className="space-y-5 p-6">
-                <Input
-                  id="title"
-                  label="Title"
-                  value={form.title}
-                  onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
-                />
-                <Textarea
-                  id="description"
-                  label="Description"
-                  value={form.description}
-                  onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
-                  rows={5}
-                />
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Thumbnail</label>
-                  <FileUpload
-                    type="image"
-                    value={form.thumbnail}
-                    onChange={(url) => setForm((prev) => ({ ...prev, thumbnail: url }))}
-                  />
-                </div>
-                <div className="flex items-center justify-between border-t border-gray-100 pt-5">
-                  <div className="flex items-center gap-3">
-                    <Toggle on={course.published} onChange={togglePublish} />
-                    <span className="text-base text-gray-900">{course.published ? "Published" : "Draft: not visible to learners"}</span>
-                  </div>
-                  <Button onClick={saveCourse} loading={saving}>
-                    Save changes
-                  </Button>
-                </div>
-              </div>
-            </div>
+            <CourseInfoTab
+              key={course.id}
+              course={course}
+              videoChapters={course.modules.flatMap((m) => m.lessons.filter((l) => l.videoUrl).map((l) => ({ moduleId: m.id, lessonId: l.id })))}
+              onSaved={fetchCourse}
+            />
           )}
         </main>
       </div>
@@ -989,7 +942,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
               ?.lessons.find((l) => l.id === showVideoModal.lessonId)?.videoUrl || ""}
             currentThumb={course.modules
               .find((m) => m.id === showVideoModal.moduleId)
-              ?.lessons.find((l) => l.id === showVideoModal.lessonId)?.thumbnail || ""}
+              ?.lessons.find((l) => l.id === showVideoModal.lessonId)?.thumbnail || course.defaultThumbnail || ""}
             onSave={async (videoUrl, thumbnail) => {
               await updateChapter(showVideoModal.moduleId, showVideoModal.lessonId, { videoUrl, thumbnail });
               toast.success("Saved");

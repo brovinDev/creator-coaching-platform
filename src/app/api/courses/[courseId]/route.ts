@@ -2,6 +2,27 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth, getNocodeToken } from "@/lib/auth";
 import { nocodeDb } from "@/lib/nocode/db";
 
+/** Information-tab settings: text columns, and switches kept as 'true'/'false'. */
+const TEXT_SETTINGS = [
+  { api: "instructor", db: "instructor" },
+  { api: "durationHours", db: "duration_hours" },
+  { api: "durationMinutes", db: "duration_minutes" },
+  { api: "defaultThumbnail", db: "default_thumbnail" },
+  { api: "validityDays", db: "validity_days" },
+];
+const SWITCH_SETTINGS = [
+  { api: "showAsLocked", db: "show_as_locked" },
+  { api: "disableQna", db: "disable_qna" },
+  { api: "disableComments", db: "disable_comments" },
+];
+
+function settingsOut(c: Record<string, unknown>) {
+  const out: Record<string, unknown> = {};
+  for (const k of TEXT_SETTINGS) out[k.api] = typeof c[k.db] === "string" ? c[k.db] : "";
+  for (const k of SWITCH_SETTINGS) out[k.api] = c[k.db] === true || c[k.db] === "true";
+  return out;
+}
+
 function mapLesson(l: Record<string, unknown>) {
   return {
     id: l.id,
@@ -51,6 +72,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ cour
   );
 
   const enrollmentCount = await nocodeDb.enrollments.count({ course_id: courseId }, token);
+  const profile = await nocodeDb.userProfiles.findUnique({ user_id: session.user.id }, token).catch(() => null);
+  const creatorName = profile
+    ? `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || "Creator"
+    : "Creator";
 
   return NextResponse.json({
     id: course.id,
@@ -61,6 +86,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ cour
     published: course.published,
     thumbnail: course.thumbnail,
     creatorId: course.creator_id,
+    creatorName,
+    ...settingsOut(course),
     modules: modulesWithLessons,
     _count: { enrollments: enrollmentCount },
   });
@@ -84,6 +111,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ co
     if (data.description !== undefined) updateFields.description = data.description;
     if (data.thumbnail !== undefined) updateFields.thumbnail = data.thumbnail;
     if (data.published !== undefined) updateFields.published = data.published;
+    for (const key of TEXT_SETTINGS) {
+      if (data[key.api] !== undefined) updateFields[key.db] = String(data[key.api] ?? "");
+    }
+    for (const key of SWITCH_SETTINGS) {
+      if (data[key.api] !== undefined) updateFields[key.db] = data[key.api] ? "true" : "false";
+    }
 
     await nocodeDb.courses.update(courseId, updateFields, token);
 
