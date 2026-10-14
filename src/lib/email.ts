@@ -44,11 +44,11 @@ export function otpEmail(name: string, otp: string) {
       <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
         <h1 style="color: #1a1a1a;">Verify your email</h1>
         <p>Hi ${name}, use the code below to verify your email address:</p>
-        <div style="margin: 24px 0; padding: 24px; background: #f5f3ff; border-radius: 12px; text-align: center;">
+        <div style="margin: 24px 0; padding: 24px; background: #eef5fe; border-radius: 12px; text-align: center;">
           <div style="margin-bottom: 8px;">
-            ${otp.split("").map((d) => `<span style="display: inline-block; width: 40px; height: 48px; line-height: 48px; margin: 0 3px; background: white; border-radius: 8px; font-size: 28px; font-weight: bold; color: #4f46e5; border: 2px solid #e0e7ff;">${d}</span>`).join("")}
+            ${otp.split("").map((d) => `<span style="display: inline-block; width: 40px; height: 48px; line-height: 48px; margin: 0 3px; background: white; border-radius: 8px; font-size: 28px; font-weight: bold; color: #3484f2; border: 2px solid #cfe2fc;">${d}</span>`).join("")}
           </div>
-          <p style="margin: 12px 0 0; font-size: 13px; color: #6b7280;">Tap and hold to copy: <span style="user-select: all; -webkit-user-select: all; font-weight: bold; color: #4f46e5; letter-spacing: 2px; padding: 2px 8px; background: white; border-radius: 4px;">${otp}</span></p>
+          <p style="margin: 12px 0 0; font-size: 13px; color: #6b7280;">Tap and hold to copy: <span style="user-select: all; -webkit-user-select: all; font-weight: bold; color: #3484f2; letter-spacing: 2px; padding: 2px 8px; background: white; border-radius: 4px;">${otp}</span></p>
         </div>
         <p style="color: #666;">This code expires in 10 minutes. If you didn't request this, ignore this email.</p>
       </div>
@@ -64,7 +64,7 @@ export function welcomeEmail(name: string) {
         <h1 style="color: #1a1a1a;">Welcome, ${name}!</h1>
         <p>Thanks for joining ${process.env.NEXT_PUBLIC_APP_NAME}. We're excited to have you on board.</p>
         <p>Get started by exploring courses or creating your own!</p>
-        <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard" style="display: inline-block; padding: 12px 24px; background: #6366f1; color: white; text-decoration: none; border-radius: 6px;">Go to Dashboard</a>
+        <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard" style="display: inline-block; padding: 12px 24px; background: #3484f2; color: white; text-decoration: none; border-radius: 6px;">Go to Dashboard</a>
       </div>
     `,
   };
@@ -77,7 +77,7 @@ export function passwordResetEmail(name: string, resetUrl: string) {
       <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
         <h1 style="color: #1a1a1a;">Reset Your Password</h1>
         <p>Hi ${name}, we received a request to reset your password.</p>
-        <a href="${resetUrl}" style="display: inline-block; padding: 12px 24px; background: #6366f1; color: white; text-decoration: none; border-radius: 6px;">Reset Password</a>
+        <a href="${resetUrl}" style="display: inline-block; padding: 12px 24px; background: #3484f2; color: white; text-decoration: none; border-radius: 6px;">Reset Password</a>
         <p style="color: #666; margin-top: 16px;">This link expires in 1 hour. If you didn't request this, ignore this email.</p>
       </div>
     `,
@@ -92,7 +92,7 @@ export function paymentConfirmationEmail(name: string, courseName: string, amoun
         <h1 style="color: #1a1a1a;">Payment Confirmed!</h1>
         <p>Hi ${name}, your payment of ₹${amount} for <strong>${courseName}</strong> has been confirmed.</p>
         <p>You now have full access to the course.</p>
-        <a href="${process.env.NEXT_PUBLIC_APP_URL}/courses" style="display: inline-block; padding: 12px 24px; background: #6366f1; color: white; text-decoration: none; border-radius: 6px;">Start Learning</a>
+        <a href="${process.env.NEXT_PUBLIC_APP_URL}/courses" style="display: inline-block; padding: 12px 24px; background: #3484f2; color: white; text-decoration: none; border-radius: 6px;">Start Learning</a>
       </div>
     `,
   };
@@ -105,7 +105,7 @@ export function enrollmentEmail(name: string, courseName: string) {
       <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
         <h1 style="color: #1a1a1a;">You're In!</h1>
         <p>Hi ${name}, you've been enrolled in <strong>${courseName}</strong>.</p>
-        <a href="${process.env.NEXT_PUBLIC_APP_URL}/courses" style="display: inline-block; padding: 12px 24px; background: #6366f1; color: white; text-decoration: none; border-radius: 6px;">Access Course</a>
+        <a href="${process.env.NEXT_PUBLIC_APP_URL}/courses" style="display: inline-block; padding: 12px 24px; background: #3484f2; color: white; text-decoration: none; border-radius: 6px;">Access Course</a>
       </div>
     `,
   };
@@ -118,7 +118,7 @@ export function creatorPurchaseNotificationEmail(creatorName: string, studentNam
       <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
         <h1 style="color: #1a1a1a;">New Sale!</h1>
         <p>Hi ${creatorName}, ${studentName} just purchased <strong>${courseName}</strong> for ₹${amount}.</p>
-        <a href="${process.env.NEXT_PUBLIC_APP_URL}/creator/payments" style="display: inline-block; padding: 12px 24px; background: #6366f1; color: white; text-decoration: none; border-radius: 6px;">View Payments</a>
+        <a href="${process.env.NEXT_PUBLIC_APP_URL}/creator/payments" style="display: inline-block; padding: 12px 24px; background: #3484f2; color: white; text-decoration: none; border-radius: 6px;">View Payments</a>
       </div>
     `,
   };
@@ -207,7 +207,7 @@ export function serviceRegistrationEmail(input: ServiceRegistrationEmailInput) {
         ${receipt}
         ${startsLater ? `<p>This service starts on <strong>${startsLater}</strong>.</p>` : ""}
         <p>Sign in to ${appName} to access everything included in your registration.</p>
-        <a href="${appUrl}/courses" style="display: inline-block; padding: 12px 24px; background: ${escapeHtml(input.buttonColor || "#6366f1")}; color: ${escapeHtml(readableTextColor(input.buttonColor || "#6366f1"))}; text-decoration: none; border-radius: 6px;">Go to my dashboard</a>
+        <a href="${appUrl}/courses" style="display: inline-block; padding: 12px 24px; background: ${escapeHtml(input.buttonColor || "#3484f2")}; color: ${escapeHtml(readableTextColor(input.buttonColor || "#3484f2"))}; text-decoration: none; border-radius: 6px;">Go to my dashboard</a>
       </div>
     `,
   };
@@ -236,7 +236,7 @@ export function serviceSaleNotificationEmail(input: ServiceSaleNotificationInput
         <p>Hi ${escapeHtml(input.creatorName || "there")}, <strong>${learner}</strong> (${escapeHtml(input.learnerEmail)}) just ${
           paid ? `purchased <strong>${service}</strong> for ${formatAmount(input.amount!, input.currency)}` : `registered for <strong>${service}</strong>`
         }.</p>
-        <a href="${process.env.NEXT_PUBLIC_APP_URL}/creator/${paid ? "payments" : "customers"}" style="display: inline-block; padding: 12px 24px; background: #6366f1; color: white; text-decoration: none; border-radius: 6px;">${paid ? "View payments" : "View customers"}</a>
+        <a href="${process.env.NEXT_PUBLIC_APP_URL}/creator/${paid ? "payments" : "customers"}" style="display: inline-block; padding: 12px 24px; background: #3484f2; color: white; text-decoration: none; border-radius: 6px;">${paid ? "View payments" : "View customers"}</a>
       </div>
     `,
   };
@@ -249,7 +249,7 @@ export function communityReplyEmail(name: string, postTitle: string, communityUr
       <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
         <h1 style="color: #1a1a1a;">New Reply</h1>
         <p>Hi ${name}, someone replied to your post "<strong>${postTitle || "your post"}</strong>".</p>
-        <a href="${communityUrl}" style="display: inline-block; padding: 12px 24px; background: #6366f1; color: white; text-decoration: none; border-radius: 6px;">View Reply</a>
+        <a href="${communityUrl}" style="display: inline-block; padding: 12px 24px; background: #3484f2; color: white; text-decoration: none; border-radius: 6px;">View Reply</a>
       </div>
     `,
   };

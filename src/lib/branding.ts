@@ -73,7 +73,7 @@ export function brandingFieldsFromBody(body: Record<string, unknown>): Record<st
   }
   if (typeof body.theme_color === "string") {
     const color = body.theme_color.trim();
-    if (color && !isValidHexColor(color)) return "Theme colour must look like #4f46e5";
+    if (color && !isValidHexColor(color)) return "Theme colour must look like #3484f2";
     data.theme_color = color.toLowerCase();
   }
   for (const key of URL_FIELDS) {

@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
           <h1 style="color: #1a1a1a;">Welcome, ${name}!</h1>
           <p>Your account has been created successfully.</p>
           <p>You can sign in anytime, with a code we email you, at:</p>
-          <a href="${process.env.NEXT_PUBLIC_APP_URL}/login" style="display: inline-block; padding: 12px 24px; background: #6366f1; color: white; text-decoration: none; border-radius: 6px;">Sign In</a>
+          <a href="${process.env.NEXT_PUBLIC_APP_URL}/login" style="display: inline-block; padding: 12px 24px; background: #3484f2; color: white; text-decoration: none; border-radius: 6px;">Sign In</a>
         </div>
       `,
       }).catch(() => {});

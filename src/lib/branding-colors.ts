@@ -3,7 +3,7 @@
 export const DEFAULT_PRODUCT_NAME = "service";
 export const MAX_PRODUCT_NAME = 20;
 
-export const DEFAULT_THEME_COLOR = "#4f46e5";
+export const DEFAULT_THEME_COLOR = "#3484f2";
 
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 

@@ -728,7 +728,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ courseI
                                         <FileTile color="#1fa463" title="Add discussion" onClick={() => toast("Coming soon")}>
                                           <MdQuestionAnswer className="h-6 w-6 text-white" />
                                         </FileTile>
-                                        <FileTile color="#4f46e5" title="Add embedded link" onClick={() => setShowVideoModal({ moduleId: mod.id, lessonId: lesson.id, mode: "url" })}>
+                                        <FileTile color="#3484f2" title="Add embedded link" onClick={() => setShowVideoModal({ moduleId: mod.id, lessonId: lesson.id, mode: "url" })}>
                                           <MdLink className="h-7 w-7 text-white" />
                                         </FileTile>
                                         <span className="h-12 w-px bg-gray-300" />

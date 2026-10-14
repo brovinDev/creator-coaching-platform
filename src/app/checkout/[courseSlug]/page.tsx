@@ -290,7 +290,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
             } else router.push("/payment-failed");
           },
           modal: { ondismiss: () => setSubmitting(false) },
-          theme: { color: "#4F46E5" },
+          theme: { color: "#3484F2" },
         };
         new window.Razorpay(subOptions).open();
         return;
@@ -318,7 +318,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ courseSlug:
           } else router.push("/payment-failed");
         },
         modal: { ondismiss: () => setSubmitting(false) },
-        theme: { color: "#4F46E5" },
+        theme: { color: "#3484F2" },
       };
       const rzp = new window.Razorpay(options);
       rzp.open();

@@ -53,11 +53,13 @@ export default function SignupPage() {
     return () => clearTimeout(t);
   }, [resendIn]);
 
-  const ready = form.name.trim().length > 0 && form.email.trim().length > 0 && form.phone.length >= 6 && terms;
-
   async function sendCode(e?: React.FormEvent) {
     e?.preventDefault();
-    if (!ready || loading) return;
+    if (loading) return;
+    if (!form.name.trim()) return void toast.error("Enter your name");
+    if (!form.email.trim()) return void toast.error("Enter your email");
+    if (form.phone.length < 6) return void toast.error("Enter your phone number");
+    if (!terms) return void toast.error("Please agree to the Terms of Service and Privacy Policy");
     setLoading(true);
     try {
       const res = await fetch("/api/auth/send-otp", {
@@ -212,8 +214,8 @@ export default function SignupPage() {
 
         <button
           type="submit"
-          disabled={!ready || loading}
-          className="h-[56px] w-full cursor-pointer rounded-md bg-indigo-600 text-xl font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={loading}
+          className="h-[56px] w-full cursor-pointer rounded-md bg-indigo-600 text-xl font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-70"
         >
           {loading ? "Sending code..." : "Get started"}
         </button>
@@ -221,7 +223,7 @@ export default function SignupPage() {
 
       <p className="mt-5 text-center text-lg text-black">
         Already have an account?{" "}
-        <Link href="/login" className="font-medium text-[#1d86ff] hover:underline">
+        <Link href="/login" className="font-medium text-indigo-600 hover:underline">
           Login
         </Link>
       </p>

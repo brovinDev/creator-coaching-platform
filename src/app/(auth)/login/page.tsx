@@ -29,6 +29,7 @@ export default function LoginPage() {
   async function sendCode(e?: React.FormEvent) {
     e?.preventDefault();
     if (loading) return;
+    if (!email.trim()) return void toast.error("Enter your email");
     setLoading(true);
     try {
       const res = await fetch("/api/auth/login-otp", {
@@ -132,8 +133,8 @@ export default function LoginPage() {
           />
           <button
             type="submit"
-            disabled={!email.trim() || loading}
-            className="mt-10 h-[57px] w-full cursor-pointer rounded-md bg-indigo-600 text-xl font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={loading}
+            className="mt-10 h-[57px] w-full cursor-pointer rounded-md bg-indigo-600 text-xl font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-70"
           >
             {loading ? "Sending code..." : "Request OTP"}
           </button>
@@ -141,7 +142,7 @@ export default function LoginPage() {
 
         <p className="mt-12 text-center text-lg text-black">
           Not registered yet?{" "}
-          <Link href="/signup" className="font-semibold text-[#1d86ff] hover:underline">
+          <Link href="/signup" className="font-semibold text-indigo-600 hover:underline">
             Sign Up
           </Link>
         </p>
